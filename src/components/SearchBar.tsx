@@ -309,21 +309,83 @@ const SearchBar = () => {
               <Typography variant="subtitle2" gutterBottom fontWeight={600}>
                 Search Tips
               </Typography>
-              <Typography variant="body2" gutterBottom>
-                • Use spaces to separate multiple tags
+              <Typography variant="body2" sx={{ mb: 1.5, color: "rgba(255, 255, 255, 0.7)" }}>
+                Use these operators to refine your search:
               </Typography>
-              <Typography variant="body2" gutterBottom>
-                • Add - before a tag to exclude it (e.g. -cat)
-              </Typography>
-              <Typography variant="body2" gutterBottom>
-                • Use rating:safe, rating:questionable, or rating:explicit to filter by rating
-              </Typography>
-              <Typography variant="body2" gutterBottom>
-                • Use order:rank, order:popular, order:score for sorting
-              </Typography>
-              <Typography variant="body2">
-                • Use * for wildcard searches (e.g. blue_*)
-              </Typography>
+              
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                <Box>
+                  <Typography variant="body2" fontWeight={500} sx={{ color: "#FFB74A" }}>
+                    Basic Search
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "rgba(255, 255, 255, 0.6)", display: "block", mt: 0.5 }}>
+                    • Press enter or click a tag to add it to your search, press enter again to execute the search
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "rgba(255, 255, 255, 0.6)", display: "block" }}>
+                    • Use underscores for multi-word tags (e.g., <code style={{ background: "rgba(255,255,255,0.1)", padding: "2px 4px", borderRadius: "2px" }}>long_hair</code>)
+                  </Typography>
+                </Box>
+
+                <Box>
+                  <Typography variant="body2" fontWeight={500} sx={{ color: "#FF5D8F" }}>
+                    Exclusion
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "rgba(255, 255, 255, 0.6)", display: "block", mt: 0.5 }}>
+                    • Use <code style={{ background: "rgba(255,255,255,0.1)", padding: "2px 4px", borderRadius: "2px" }}>-</code> to exclude tags (e.g., <code style={{ background: "rgba(255,255,255,0.1)", padding: "2px 4px", borderRadius: "2px" }}>cat -dog</code>)
+                  </Typography>
+                </Box>
+
+                <Box>
+                  <Typography variant="body2" fontWeight={500} sx={{ color: "#56C991" }}>
+                    Rating Filters
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "rgba(255, 255, 255, 0.6)", display: "block", mt: 0.5 }}>
+                    • <code style={{ background: "rgba(255,255,255,0.1)", padding: "2px 4px", borderRadius: "2px" }}>rating:general</code> or <code style={{ background: "rgba(255,255,255,0.1)", padding: "2px 4px", borderRadius: "2px" }}>rating:g</code> - Safe for work content
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "rgba(255, 255, 255, 0.6)", display: "block" }}>
+                    • <code style={{ background: "rgba(255,255,255,0.1)", padding: "2px 4px", borderRadius: "2px" }}>rating:sensitive</code> or <code style={{ background: "rgba(255,255,255,0.1)", padding: "2px 4px", borderRadius: "2px" }}>rating:s</code> - Mildly suggestive
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "rgba(255, 255, 255, 0.6)", display: "block" }}>
+                    • <code style={{ background: "rgba(255,255,255,0.1)", padding: "2px 4px", borderRadius: "2px" }}>rating:questionable</code> or <code style={{ background: "rgba(255,255,255,0.1)", padding: "2px 4px", borderRadius: "2px" }}>rating:q</code> - Questionable content
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "rgba(255, 255, 255, 0.6)", display: "block" }}>
+                    • <code style={{ background: "rgba(255,255,255,0.1)", padding: "2px 4px", borderRadius: "2px" }}>rating:explicit</code> or <code style={{ background: "rgba(255,255,255,0.1)", padding: "2px 4px", borderRadius: "2px" }}>rating:e</code> - Explicit content
+                  </Typography>
+                </Box>
+
+                <Box>
+                  <Typography variant="body2" fontWeight={500} sx={{ color: "#5E81F4" }}>
+                    Wildcards
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "rgba(255, 255, 255, 0.6)", display: "block", mt: 0.5 }}>
+                    • Use <code style={{ background: "rgba(255,255,255,0.1)", padding: "2px 4px", borderRadius: "2px" }}>*</code> for partial matches (e.g., <code style={{ background: "rgba(255,255,255,0.1)", padding: "2px 4px", borderRadius: "2px" }}>*girl</code>, <code style={{ background: "rgba(255,255,255,0.1)", padding: "2px 4px", borderRadius: "2px" }}>cat*</code>)
+                  </Typography>
+                </Box>
+
+                <Box>
+                  <Typography variant="body2" fontWeight={500} sx={{ color: "#B388FF" }}>
+                    Meta Tags
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "rgba(255, 255, 255, 0.6)", display: "block", mt: 0.5 }}>
+                    • <code style={{ background: "rgba(255,255,255,0.1)", padding: "2px 4px", borderRadius: "2px" }}>order:score</code> - Sort by score
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "rgba(255, 255, 255, 0.6)", display: "block" }}>
+                    • <code style={{ background: "rgba(255,255,255,0.1)", padding: "2px 4px", borderRadius: "2px" }}>order:favcount</code> - Sort by favorites
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "rgba(255, 255, 255, 0.6)", display: "block" }}>
+                    • <code style={{ background: "rgba(255,255,255,0.1)", padding: "2px 4px", borderRadius: "2px" }}>order:date</code> - Sort by upload date (newest first)
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "rgba(255, 255, 255, 0.6)", display: "block" }}>
+                    • <code style={{ background: "rgba(255,255,255,0.1)", padding: "2px 4px", borderRadius: "2px" }}>order:random</code> - Random order
+                  </Typography>
+                </Box>
+
+                <Box sx={{ mt: 1, pt: 1, borderTop: "1px solid rgba(255, 255, 255, 0.05)" }}>
+                  <Typography variant="caption" sx={{ color: "rgba(255, 255, 255, 0.5)", fontStyle: "italic" }}>
+                    💡 Tip: You can combine multiple tags and operators for precise searches
+                  </Typography>
+                </Box>
+              </Box>
             </Paper>
           </Collapse>
         </Box>
