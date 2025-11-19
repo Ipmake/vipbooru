@@ -16,7 +16,7 @@ function App() {
       
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Navigate to="/search?tags=rating%3Agenera" replace />} />
+          <Route path="/" element={<Navigate to="/search?tags=rating%3Ageneral" replace />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/search/:postId" element={<SearchPage />} />
           <Route path="/search/*" element={<SearchPage />} />
