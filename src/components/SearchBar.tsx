@@ -18,6 +18,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import type { AutocompleteResult } from "../types";
 import { useSearchParams } from "react-router-dom";
 import { danbooruService } from "../services/danbooru";
+import { danbooruUtil } from "../utils/danbooru";
 
 const SearchBar = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -99,10 +100,10 @@ const SearchBar = () => {
                     const isString = typeof option === "string";
                     const tagText = isString ? option : option.label;
                     const tagColor = isString
-                      ? getTagColor(tagText)
+                      ? danbooruUtil.getTagColor(tagText)
                       : (option as AutocompleteResult).category !== undefined
                       ? "default"
-                      : getTagColor(tagText);
+                      : danbooruUtil.getTagColor(tagText);
 
                     return (
                       <Chip
@@ -127,7 +128,7 @@ const SearchBar = () => {
                             },
                           },
                           backgroundColor: !isString
-                            ? getCategoryColor((option as AutocompleteResult).category)
+                            ? danbooruUtil.getCategoryColor((option as AutocompleteResult).category)
                             : undefined,
                         }}
                         {...getTagProps({ index })}
@@ -152,7 +153,7 @@ const SearchBar = () => {
                         padding: "6px 10px",
                         borderLeft: "3px solid",
                         borderLeftColor: !isString
-                          ? getCategoryColor(category as number)
+                          ? danbooruUtil.getCategoryColor(category as number)
                           : "transparent",
                         "&:hover": {
                           backgroundColor: "rgba(108, 99, 255, 0.1)",
@@ -168,14 +169,14 @@ const SearchBar = () => {
                               py: 0.2,
                               px: 0.8,
                               borderRadius: "4px",
-                              backgroundColor: getCategoryColor(category),
+                              backgroundColor: danbooruUtil.getCategoryColor(category),
                               color: "#fff",
                               fontWeight: 600,
                               fontSize: "0.65rem",
                               letterSpacing: 0.3,
                             }}
                           >
-                            {getCategoryName(category)}
+                            {danbooruUtil.getCategoryName(category)}
                           </Typography>
                         )}
                         <Typography>{label}</Typography>
@@ -332,51 +333,3 @@ const SearchBar = () => {
 };
 
 export default SearchBar;
-
-
-function getTagColor(tag: string): "default" | "primary" | "secondary" | "error" | "warning" | "info" | "success" {
-  if (tag.startsWith("rating:")) return "error";
-  if (tag.startsWith("status:")) return "warning";
-  if (tag.startsWith("artist:")) return "primary";
-  if (tag.startsWith("character:")) return "secondary";
-  if (tag.startsWith("copyright:")) return "info";
-  return "default";
-}
-
-function getCategoryColor(category: number): "default" | "primary" | "secondary" | "error" | "warning" | "info" | "success" {
-  switch (category) {
-    case 0:
-      return "default"; // General
-    case 1:
-      return "primary"; // Artist
-    case 2:
-      return "secondary"; // Copyright
-    case 3:
-      return "info"; // Character
-    case 4:
-      return "error"; // Species
-    case 5:
-      return "warning"; // Meta
-    default:
-      return "default";
-  }
-}
-
-function getCategoryName(category: number): string {
-  switch (category) {
-    case 0:
-      return "General";
-    case 1:
-      return "Artist";
-    case 2:
-      return "Copyright";
-    case 3:
-      return "Character";
-    case 4:
-      return "Species";
-    case 5:
-      return "Meta";
-    default:
-      return "Unknown";
-  }
-}

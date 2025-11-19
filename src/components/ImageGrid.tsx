@@ -183,7 +183,9 @@ const ImageGrid = () => {
 
   const [searchParams] = useSearchParams();
 
-  const { tags } = Object.fromEntries([...searchParams]) as { tags?: string };
+  const { tags: rawTags } = Object.fromEntries([...searchParams]) as { tags?: string };
+
+  const tags = rawTags || "";
 
   // Reset and fetch initial posts when tags change
   React.useEffect(() => {

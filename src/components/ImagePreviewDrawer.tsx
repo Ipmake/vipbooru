@@ -17,6 +17,7 @@ import type { DanbooruPost } from "../types";
 import { useNavigate, useParams } from "react-router-dom";
 import { danbooruService } from "../services/danbooru";
 import { generateFilenameFromTags } from "../utils/filenameUtils";
+import { danbooruUtil } from "../utils/danbooru";
 
 const ImagePreviewDrawer: React.FC = () => {
   const navigate = useNavigate();
@@ -350,7 +351,7 @@ const ImagePreviewDrawer: React.FC = () => {
                       </Typography>
                       <Chip
                         size="small"
-                        label={getDaysAgo(post.created_at)}
+                        label={danbooruUtil.getDaysAgo(post.created_at)}
                         sx={{
                           ml: 1,
                           height: "18px",
@@ -564,15 +565,3 @@ const ImagePreviewDrawer: React.FC = () => {
 };
 
 export default ImagePreviewDrawer;
-
-
-function getDaysAgo(dateString: string): string {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffTime = Math.abs(now.getTime() - date.getTime());
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-  if (diffDays === 0) return "Today";
-  if (diffDays === 1) return "1 day ago";
-  return `${diffDays} days ago`;
-}
