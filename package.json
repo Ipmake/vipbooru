@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build --sourcemap",
+    "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -15,25 +15,13 @@
     "@fontsource/inter": "^5.2.8",
     "@mui/icons-material": "^7.2.0",
     "@mui/material": "^7.2.0",
-    "@types/react-window": "^1.8.8",
-    "@types/react-window-infinite-loader": "^1.0.9",
-    "@virtuoso.dev/masonry": "^1.3.5",
     "axios": "^1.10.0",
-    "lodash": "^4.17.21",
-    "masonic": "^4.1.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-infinite-scroll-component": "^6.1.0",
-    "react-intersection-observer": "^9.16.0",
-    "react-router-dom": "^7.9.6",
-    "react-virtuoso": "^4.13.0",
-    "react-window": "^1.8.11",
-    "react-window-infinite-loader": "^1.0.10",
-    "zustand": "^5.0.6"
+    "react-router-dom": "^7.9.6"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",
-    "@types/lodash": "^4.17.20",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",

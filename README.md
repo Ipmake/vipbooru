@@ -1,69 +1,80 @@
-# React + TypeScript + Vite
+# VipBooru
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+<p align="center">
+  <img src="public/logo.png" alt="VipBooru Logo" width="120" />
+</p>
 
-Currently, two official plugins are available:
+<p align="center">
+  A modern frontend alternative for Danbooru
+</p>
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+<p align="center">
+  <a href="https://www.gnu.org/licenses/gpl-3.0"><img src="https://img.shields.io/badge/License-GPLv3-blue.svg" alt="License: GPL v3"></a>
+  <a href="https://reactjs.org/"><img src="https://img.shields.io/badge/React-19-61dafb.svg" alt="React"></a>
+  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5.6-blue.svg" alt="TypeScript"></a>
+</p>
 
-## Expanding the ESLint configuration
+## Features
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- Fast and responsive interface built with React and Vite
+- Mobile-friendly design that adapts to all screen sizes
+- Advanced tag search with autocomplete suggestions
+- Virtualized masonry grid for smooth scrolling with thousands of images
+- Configurable image loading (lazy/eager) for performance optimization
+- Optional API key support for increased rate limits
+- Clean, modern UI with Material-UI components
+- Supports images, gifs, and videos
 
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Installation
 
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
+### Prerequisites
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+- Node.js 20.19.0+ or 22.12.0+
+- npm 10+
+
+### Setup
+
+```bash
+git clone https://github.com/Ipmake/vipbooru.git
+cd vipbooru
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+The application will be available at `http://localhost:5173`
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Building for Production
 
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run build
+npm run preview
 ```
+
+## Usage
+
+Use the search bar to search for images using Danbooru tags. Click any image to view it in full resolution with its details. Configure your preferences in the settings page, including optional API credentials and image loading strategy.
+
+## Tech Stack
+
+- React 19
+- TypeScript
+- Vite
+- Material-UI v7
+- React Router
+- Axios
+
+## License
+
+GNU General Public License v3.0 - see [LICENSE](LICENSE) file for details.
+
+## Author
+
+Created by [Ipmake](https://ipmake.dev)
+
+- GitHub: [@Ipmake](https://github.com/Ipmake)
+- Support: [Ko-fi](https://ko-fi.com/ipmake)
+
+## Note
+
+This project is not affiliated with Danbooru. It's an independent frontend client.
+
