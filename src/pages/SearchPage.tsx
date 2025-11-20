@@ -16,7 +16,7 @@ function SearchPage() {
         overflow: "hidden",
         display: "flex",
         flexDirection: "column",
-        px: { xs: 1, sm: 2, md: 3 },
+        px: { xs: 0, sm: 1, md: 2, lg: 3 },
       }}
     >
       {/* Search area */}

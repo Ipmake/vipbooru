@@ -8,29 +8,40 @@ import {
   Collapse,
   IconButton,
   TextField,
-  Tooltip,
   Autocomplete,
   CircularProgress,
+  Divider,
+  Stack,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
+import InfoIcon from "@mui/icons-material/Info";
 import CloseIcon from "@mui/icons-material/Close";
 import type { AutocompleteResult } from "../types";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { danbooruService } from "../services/danbooru";
 import { danbooruUtil } from "../utils/danbooru";
 
 const SearchBar = () => {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { tags } = Object.fromEntries([...searchParams]) as { tags?: string };
-  const [searchTags, setSearchTags] = React.useState<string[]>(tags ? tags.split(',') : []);
+  const [searchTags, setSearchTags] = React.useState<string[]>(
+    tags ? tags.split(",") : []
+  );
 
-  const [tagSuggestions, setTagSuggestions] = React.useState<AutocompleteResult[]>([]);
+  const [tagSuggestions, setTagSuggestions] = React.useState<
+    AutocompleteResult[]
+  >([]);
   const [tagInputValue, setTagInputValue] = React.useState<string>("");
-  const [searchInputLoading, setSearchInputLoading] = React.useState<boolean>(false);
+  const [searchInputLoading, setSearchInputLoading] =
+    React.useState<boolean>(false);
+  const [autocompleteOpen, setAutocompleteOpen] =
+    React.useState<boolean>(false);
 
   const [showHelp, setShowHelp] = React.useState<boolean>(false);
-  const searchBarRef = React.useRef<HTMLDivElement>(null);
+  const [showDesktopButtons, setShowDesktopButtons] =
+    React.useState<boolean>(false);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
@@ -41,48 +52,72 @@ const SearchBar = () => {
 
       setSearchInputLoading(true);
 
-      danbooruService.searchAutocomplete(tagInputValue.trim()).then((results) => {
-        setTagSuggestions(results);
-        setSearchInputLoading(false);
-      });
-    }, 500);
+      danbooruService
+        .searchAutocomplete(tagInputValue.trim())
+        .then((results) => {
+          setTagSuggestions(results);
+          setSearchInputLoading(false);
+        });
+    }, 300);
 
     return () => clearTimeout(delayDebounceFn);
   }, [tagInputValue]);
 
   useEffect(() => {
-    setSearchTags(tags ? tags.split(',') : []);
+    setSearchTags(tags ? tags.split(",") : []);
   }, [tags]);
+
+  const handleSearch = () => {
+    const newSearchParams = new URLSearchParams();
+    if (searchTags.length > 0) {
+      newSearchParams.set("tags", searchTags.join(","));
+    }
+    setSearchParams(newSearchParams);
+  };
 
   return (
     <Box
-      ref={searchBarRef}
       sx={{
-        py: 1,
-        px: { xs: 1, md: 1 },
-        position: "relative",
-        zIndex: 1000,
+        width: "100%",
+        px: { xs: 0, sm: 2 },
+        py: { xs: 1, sm: 1.5 },
       }}
+      onMouseEnter={() => setShowDesktopButtons(true)}
+      onMouseLeave={() => setShowDesktopButtons(false)}
     >
+      {/* Main Search Container */}
       <Paper
-        elevation={1}
+        elevation={0}
         sx={{
-          p: { xs: 1, sm: 1 },
-          mb: 1,
-          borderRadius: 1,
-          backgroundColor: "rgba(30, 30, 30, 0.85)",
-          border: "1px solid rgba(255, 255, 255, 0.05)",
-          position: "relative",
+          overflow: "hidden",
+          borderRadius: { xs: 2, sm: 2 },
+          backgroundColor: "rgba(18, 18, 18, 0.95)",
+          backdropFilter: "blur(20px)",
+          border: "1px solid rgba(255, 255, 255, 0.06)",
+          boxShadow: "0 4px 16px rgba(0, 0, 0, 0.3)",
         }}
       >
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-            <Box sx={{ position: "relative", flexGrow: 1 }}>
+        {/* Search Input Area */}
+        <Box sx={{ p: { xs: 1.5, sm: 2 } }}>
+          <Stack spacing={{ xs: 1, sm: 1.5 }}>
+            {/* Search Input and Button Row */}
+            <Box
+              sx={{
+                display: "flex",
+                gap: 1,
+                alignItems: "flex-start",
+                flexDirection: { xs: "column", sm: "row" },
+                width: "100%",
+              }}
+            >
               <Autocomplete
                 multiple
                 freeSolo
                 id="tags-autocomplete"
                 options={tagSuggestions}
+                open={autocompleteOpen}
+                onOpen={() => setAutocompleteOpen(true)}
+                onClose={() => setAutocompleteOpen(false)}
                 getOptionLabel={(option) =>
                   typeof option === "string" ? option : option.label
                 }
@@ -90,12 +125,13 @@ const SearchBar = () => {
                 inputValue={tagInputValue}
                 onInputChange={(_, value) => setTagInputValue(value)}
                 onChange={(_, newValue) => {
-                  const stringValues = newValue.map(value => 
+                  const stringValues = newValue.map((value) =>
                     typeof value === "string" ? value : value.value
                   );
                   setSearchTags(stringValues);
                 }}
-                renderTags={(value, getTagProps) =>
+                sx={{ flex: 1, width: { xs: "100%", sm: "auto" } }}
+                renderValue={(value, getTagProps) =>
                   value.map((option, index) => {
                     const isString = typeof option === "string";
                     const tagText = isString ? option : option.label;
@@ -104,9 +140,11 @@ const SearchBar = () => {
                       : (option as AutocompleteResult).category !== undefined
                       ? "default"
                       : danbooruUtil.getTagColor(tagText);
+                    const { key, ...chipProps } = getTagProps({ index });
 
                     return (
                       <Chip
+                        key={key}
                         size="small"
                         variant="filled"
                         label={tagText}
@@ -131,7 +169,7 @@ const SearchBar = () => {
                             ? danbooruUtil.getCategoryColor((option as AutocompleteResult).category)
                             : undefined,
                         }}
-                        {...getTagProps({ index })}
+                        {...chipProps}
                       />
                     );
                   })
@@ -169,7 +207,8 @@ const SearchBar = () => {
                               py: 0.2,
                               px: 0.8,
                               borderRadius: "4px",
-                              backgroundColor: danbooruUtil.getCategoryColor(category),
+                              backgroundColor:
+                                danbooruUtil.getCategoryColor(category),
                               color: "#fff",
                               fontWeight: 600,
                               fontSize: "0.65rem",
@@ -201,197 +240,355 @@ const SearchBar = () => {
                   <TextField
                     {...params}
                     variant="outlined"
-                    placeholder="Search tags (e.g. cat, rating:safe)"
+                    placeholder="Search tags..."
                     onKeyDown={(key) => {
                       if (key.key === "Enter") {
-                        key.preventDefault();
-                        const newSearchParams = new URLSearchParams();
-                        if (searchTags.length > 0) {
-                          newSearchParams.set("tags", searchTags.join(","));
+                        // Only submit search if autocomplete menu is closed
+                        if (!autocompleteOpen) {
+                          key.preventDefault();
+                          handleSearch();
                         }
-                        setSearchParams(newSearchParams);
                       }
                     }}
-                    InputProps={{
-                      ...params.InputProps,
-                      endAdornment: (
-                        <>
-                          {searchInputLoading ? (
-                            <CircularProgress color="inherit" size={20} />
-                          ) : null}
-                          {params.InputProps.endAdornment}
-                        </>
-                      ),
-                      sx: {
-                        p: "2px 4px",
-                        borderRadius: "8px",
+                    slotProps={{
+                      input: {
+                        ...params.InputProps,
+                        endAdornment: (
+                          <>
+                            {searchInputLoading ? (
+                              <CircularProgress color="inherit" size={20} />
+                            ) : null}
+                            {params.InputProps.endAdornment}
+                          </>
+                        ),
+                        sx: {
+                          p: "2px 4px",
+                          borderRadius: "8px",
+                        },
                       },
                     }}
                   />
                 )}
-                sx={{
-                  "& .MuiOutlinedInput-root": {
-                    backgroundColor: "rgba(18, 18, 18, 0.7)",
-                    border: "1px solid rgba(255, 255, 255, 0.05)",
-                    position: "relative",
-                    "& fieldset": {
-                      borderColor: "transparent",
-                    },
-                    "&:hover fieldset": {
-                      borderColor: "rgba(160, 160, 160, 0.3)",
-                    },
-                    "&.Mui-focused fieldset": {
-                      borderColor: "#a0a0a0",
-                    },
-                  },
-                }}
               />
+
+              {/* Search Button - Icon only on desktop, full button on mobile */}
+              <Box
+                sx={{
+                  display: { xs: "none", sm: "flex" },
+                  alignItems: "stretch",
+                }}
+              >
+                <IconButton
+                  onClick={handleSearch}
+                  sx={{
+                    height: "100%",
+                    minHeight: 56,
+                    width: 56,
+                    borderRadius: 2,
+                    backgroundColor: "#a0a0a0",
+                    color: "#fff",
+                    "&:hover": {
+                      backgroundColor: "#909090",
+                    },
+                  }}
+                >
+                  <SearchIcon sx={{ fontSize: 22 }} />
+                </IconButton>
+              </Box>
             </Box>
 
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={() => {
-                const newSearchParams = new URLSearchParams();
-                if (searchTags.length > 0) {
-                  newSearchParams.set("tags", searchTags.join(","));
-                }
-                setSearchParams(newSearchParams);
-              }}
-              startIcon={<SearchIcon />}
-              size="small"
+            {/* Mobile Action Buttons Row */}
+            <Box
               sx={{
-                height: "48px",
-                px: 1.5,
-                backgroundColor: "#a0a0a0",
-                borderRadius: "2px",
-                "&:hover": {
-                  backgroundColor: "#808080",
-                },
+                display: { xs: "flex", sm: "none" },
+                gap: 1,
               }}
             >
-              Search
-            </Button>
-
-            <Tooltip title="Search Help">
-              <IconButton
-                color="primary"
-                onClick={() => setShowHelp(!showHelp)}
+              <Button
+                variant="contained"
+                size="medium"
+                onClick={handleSearch}
+                startIcon={<SearchIcon sx={{ fontSize: 18 }} />}
                 sx={{
-                  backgroundColor: "rgba(160, 160, 160, 0.1)",
-                  border: "1px solid rgba(255, 255, 255, 0.05)",
-                  height: "32px",
-                  width: "32px",
-                  padding: "4px",
+                  flex: 1,
+                  height: 38,
+                  borderRadius: 2,
+                  fontSize: "0.875rem",
+                  fontWeight: 600,
+                  textTransform: "none",
+                  backgroundColor: "#a0a0a0",
+                  color: "#fff",
+                  boxShadow: "none",
                   "&:hover": {
-                    backgroundColor: "rgba(160, 160, 160, 0.2)",
+                    backgroundColor: "#909090",
+                    boxShadow: "none",
                   },
                 }}
               >
-                {showHelp ? <CloseIcon /> : <HelpOutlineIcon />}
-              </IconButton>
-            </Tooltip>
-          </Box>
+                Search
+              </Button>
 
-          <Collapse in={showHelp}>
-            <Paper
+              <IconButton
+                onClick={() => setShowHelp(!showHelp)}
+                sx={{
+                  height: 38,
+                  width: 38,
+                  borderRadius: 2,
+                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                  backgroundColor: showHelp
+                    ? "rgba(160, 160, 160, 0.1)"
+                    : "transparent",
+                  color: "rgba(255, 255, 255, 0.85)",
+                }}
+              >
+                {showHelp ? (
+                  <CloseIcon sx={{ fontSize: 18 }} />
+                ) : (
+                  <HelpOutlineIcon sx={{ fontSize: 18 }} />
+                )}
+              </IconButton>
+
+              <IconButton
+                onClick={() => navigate("/info")}
+                sx={{
+                  height: 38,
+                  width: 38,
+                  borderRadius: 2,
+                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                  backgroundColor: "transparent",
+                  color: "rgba(255, 255, 255, 0.85)",
+                }}
+              >
+                <InfoIcon sx={{ fontSize: 18 }} />
+              </IconButton>
+            </Box>
+
+            {/* Desktop Action Buttons Row - Appears on hover */}
+            <Collapse
+              in={showDesktopButtons}
+              sx={{ display: { xs: "none", sm: "block" } }}
+            >
+              <Box
+                sx={{
+                  display: "flex",
+                  gap: 1,
+                  justifyContent: "flex-end",
+                  pt: 1,
+                }}
+              >
+                <Button
+                  variant="outlined"
+                  size="medium"
+                  onClick={() => setShowHelp(!showHelp)}
+                  startIcon={
+                    showHelp ? (
+                      <CloseIcon sx={{ fontSize: 20 }} />
+                    ) : (
+                      <HelpOutlineIcon sx={{ fontSize: 20 }} />
+                    )
+                  }
+                  sx={{
+                    minWidth: 100,
+                    height: 40,
+                    borderRadius: 2,
+                    fontSize: "0.9rem",
+                    fontWeight: 500,
+                    textTransform: "none",
+                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                    backgroundColor: showHelp
+                      ? "rgba(160, 160, 160, 0.2)"
+                      : "transparent",
+                    color: "rgba(255, 255, 255, 0.85)",
+                  }}
+                >
+                  {showHelp ? "Close" : "Help"}
+                </Button>
+
+                <IconButton
+                  onClick={() => navigate("/info")}
+                  sx={{
+                    height: 40,
+                    width: 40,
+                    borderRadius: 2,
+                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                    backgroundColor: "transparent",
+                    color: "rgba(255, 255, 255, 0.85)",
+                  }}
+                >
+                  <InfoIcon sx={{ fontSize: 22 }} />
+                </IconButton>
+              </Box>
+            </Collapse>
+          </Stack>
+        </Box>
+
+        {/* Help Section */}
+        <Collapse in={showHelp}>
+          <Divider sx={{ borderColor: "rgba(255, 255, 255, 0.06)" }} />
+          <Box
+            sx={{
+              p: { xs: 1.5, sm: 2 },
+              backgroundColor: "rgba(0, 0, 0, 0.2)",
+            }}
+          >
+            <Typography
+              variant="h6"
               sx={{
-                p: 1.5,
-                mb: 1,
-                backgroundColor: "rgba(25, 25, 25, 0.7)",
-                borderRadius: 1,
-                border: "1px solid rgba(255, 255, 255, 0.05)",
-                boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
-                position: "relative",
-                overflow: "hidden",
+                mb: 2,
+                fontWeight: 600,
+                fontSize: { xs: "0.95rem", sm: "1rem" },
+                color: "rgba(255, 255, 255, 0.95)",
               }}
             >
-              <Typography variant="subtitle2" gutterBottom fontWeight={600}>
-                Search Tips
-              </Typography>
-              <Typography variant="body2" sx={{ mb: 1.5, color: "rgba(255, 255, 255, 0.7)" }}>
-                Use these operators to refine your search:
-              </Typography>
-              
-              <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                <Box>
-                  <Typography variant="body2" fontWeight={500} sx={{ color: "#FFB74A" }}>
-                    Basic Search
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: "rgba(255, 255, 255, 0.6)", display: "block", mt: 0.5 }}>
-                    • Press enter or click a tag to add it to your search, press enter again to execute the search
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: "rgba(255, 255, 255, 0.6)", display: "block" }}>
-                    • Use underscores for multi-word tags (e.g., <code style={{ background: "rgba(255,255,255,0.1)", padding: "2px 4px", borderRadius: "2px" }}>long_hair</code>)
-                  </Typography>
-                </Box>
+              Search Guide
+            </Typography>
 
-                <Box>
-                  <Typography variant="body2" fontWeight={500} sx={{ color: "#FF5D8F" }}>
-                    Exclusion
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: "rgba(255, 255, 255, 0.6)", display: "block", mt: 0.5 }}>
-                    • Use <code style={{ background: "rgba(255,255,255,0.1)", padding: "2px 4px", borderRadius: "2px" }}>-</code> to exclude tags (e.g., <code style={{ background: "rgba(255,255,255,0.1)", padding: "2px 4px", borderRadius: "2px" }}>cat -dog</code>)
-                  </Typography>
-                </Box>
+            <Stack spacing={1.5}>
+              <HelpSection
+                title="Basic Usage"
+                color="#FFB74A"
+                items={[
+                  "Type tags and press Enter to add them",
+                  <>
+                    Use underscores for phrases: <Code>long_hair</Code>
+                  </>,
+                ]}
+              />
 
-                <Box>
-                  <Typography variant="body2" fontWeight={500} sx={{ color: "#56C991" }}>
-                    Rating Filters
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: "rgba(255, 255, 255, 0.6)", display: "block", mt: 0.5 }}>
-                    • <code style={{ background: "rgba(255,255,255,0.1)", padding: "2px 4px", borderRadius: "2px" }}>rating:general</code> or <code style={{ background: "rgba(255,255,255,0.1)", padding: "2px 4px", borderRadius: "2px" }}>rating:g</code> - Safe for work content
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: "rgba(255, 255, 255, 0.6)", display: "block" }}>
-                    • <code style={{ background: "rgba(255,255,255,0.1)", padding: "2px 4px", borderRadius: "2px" }}>rating:sensitive</code> or <code style={{ background: "rgba(255,255,255,0.1)", padding: "2px 4px", borderRadius: "2px" }}>rating:s</code> - Mildly suggestive
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: "rgba(255, 255, 255, 0.6)", display: "block" }}>
-                    • <code style={{ background: "rgba(255,255,255,0.1)", padding: "2px 4px", borderRadius: "2px" }}>rating:questionable</code> or <code style={{ background: "rgba(255,255,255,0.1)", padding: "2px 4px", borderRadius: "2px" }}>rating:q</code> - Questionable content
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: "rgba(255, 255, 255, 0.6)", display: "block" }}>
-                    • <code style={{ background: "rgba(255,255,255,0.1)", padding: "2px 4px", borderRadius: "2px" }}>rating:explicit</code> or <code style={{ background: "rgba(255,255,255,0.1)", padding: "2px 4px", borderRadius: "2px" }}>rating:e</code> - Explicit content
-                  </Typography>
-                </Box>
+              <HelpSection
+                title="Exclude Tags"
+                color="#FF5D8F"
+                items={[
+                  <>
+                    Add <Code>-</Code> before tags: <Code>cat -dog</Code>
+                  </>,
+                ]}
+              />
 
-                <Box>
-                  <Typography variant="body2" fontWeight={500} sx={{ color: "#5E81F4" }}>
-                    Wildcards
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: "rgba(255, 255, 255, 0.6)", display: "block", mt: 0.5 }}>
-                    • Use <code style={{ background: "rgba(255,255,255,0.1)", padding: "2px 4px", borderRadius: "2px" }}>*</code> for partial matches (e.g., <code style={{ background: "rgba(255,255,255,0.1)", padding: "2px 4px", borderRadius: "2px" }}>*girl</code>, <code style={{ background: "rgba(255,255,255,0.1)", padding: "2px 4px", borderRadius: "2px" }}>cat*</code>)
-                  </Typography>
-                </Box>
+              <HelpSection
+                title="Content Ratings"
+                color="#56C991"
+                items={[
+                  <>
+                    <Code>rating:g</Code> Safe for work
+                  </>,
+                  <>
+                    <Code>rating:s</Code> Mildly suggestive
+                  </>,
+                  <>
+                    <Code>rating:q</Code> Questionable
+                  </>,
+                  <>
+                    <Code>rating:e</Code> Explicit
+                  </>,
+                ]}
+              />
 
-                <Box>
-                  <Typography variant="body2" fontWeight={500} sx={{ color: "#B388FF" }}>
-                    Meta Tags
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: "rgba(255, 255, 255, 0.6)", display: "block", mt: 0.5 }}>
-                    • <code style={{ background: "rgba(255,255,255,0.1)", padding: "2px 4px", borderRadius: "2px" }}>order:score</code> - Sort by score
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: "rgba(255, 255, 255, 0.6)", display: "block" }}>
-                    • <code style={{ background: "rgba(255,255,255,0.1)", padding: "2px 4px", borderRadius: "2px" }}>order:favcount</code> - Sort by favorites
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: "rgba(255, 255, 255, 0.6)", display: "block" }}>
-                    • <code style={{ background: "rgba(255,255,255,0.1)", padding: "2px 4px", borderRadius: "2px" }}>order:date</code> - Sort by upload date (newest first)
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: "rgba(255, 255, 255, 0.6)", display: "block" }}>
-                    • <code style={{ background: "rgba(255,255,255,0.1)", padding: "2px 4px", borderRadius: "2px" }}>order:random</code> - Random order
-                  </Typography>
-                </Box>
+              <HelpSection
+                title="Wildcards"
+                color="#5E81F4"
+                items={[
+                  <>
+                    Use <Code>*</Code> for partial matches: <Code>*girl</Code>
+                  </>,
+                ]}
+              />
 
-                <Box sx={{ mt: 1, pt: 1, borderTop: "1px solid rgba(255, 255, 255, 0.05)" }}>
-                  <Typography variant="caption" sx={{ color: "rgba(255, 255, 255, 0.5)", fontStyle: "italic" }}>
-                    💡 Tip: You can combine multiple tags and operators for precise searches
-                  </Typography>
-                </Box>
+              <HelpSection
+                title="Sort Options"
+                color="#B388FF"
+                items={[
+                  <>
+                    <Code>order:score</Code> Highest rated
+                  </>,
+                  <>
+                    <Code>order:favcount</Code> Most favorited
+                  </>,
+                  <>
+                    <Code>order:date</Code> Newest uploads
+                  </>,
+                  <>
+                    <Code>order:random</Code> Random
+                  </>,
+                ]}
+              />
+
+              <Box
+                sx={{
+                  mt: 1,
+                  pt: 1.5,
+                  borderTop: "1px solid rgba(255, 255, 255, 0.06)",
+                }}
+              >
+                <Typography
+                  variant="body2"
+                  sx={{
+                    color: "rgba(255, 255, 255, 0.5)",
+                    fontSize: { xs: "0.8rem", sm: "0.85rem" },
+                  }}
+                >
+                  💡 Combine multiple tags and operators for precise searches
+                </Typography>
               </Box>
-            </Paper>
-          </Collapse>
-        </Box>
+            </Stack>
+          </Box>
+        </Collapse>
       </Paper>
     </Box>
   );
 };
+
+// Helper Components
+interface HelpSectionProps {
+  title: string;
+  color: string;
+  items: React.ReactNode[];
+}
+
+const HelpSection: React.FC<HelpSectionProps> = ({ title, color, items }) => (
+  <Box>
+    <Typography
+      variant="subtitle2"
+      sx={{
+        fontWeight: 600,
+        color,
+        fontSize: { xs: "0.8rem", sm: "0.85rem" },
+        mb: 0.75,
+      }}
+    >
+      {title}
+    </Typography>
+    <Stack spacing={0.5} sx={{ pl: { xs: 1.5, sm: 2 } }}>
+      {items.map((item, i) => (
+        <Typography
+          key={i}
+          variant="body2"
+          sx={{
+            color: "rgba(255, 255, 255, 0.7)",
+            fontSize: { xs: "0.75rem", sm: "0.8rem" },
+            lineHeight: 1.6,
+          }}
+        >
+          • {item}
+        </Typography>
+      ))}
+    </Stack>
+  </Box>
+);
+
+const Code: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <code
+    style={{
+      background: "rgba(255, 255, 255, 0.08)",
+      padding: "2px 6px",
+      borderRadius: "4px",
+      fontSize: "0.9em",
+      fontFamily: "monospace",
+      fontWeight: 500,
+    }}
+  >
+    {children}
+  </code>
+);
 
 export default SearchBar;

@@ -5,6 +5,7 @@ import {
 import theme from './theme';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import SearchPage from './pages/SearchPage';
+import InfoPage from './pages/InfoPage';
 
 function App() {
   // const muiTheme = useTheme();
@@ -20,6 +21,7 @@ function App() {
           <Route path="/search" element={<SearchPage />} />
           <Route path="/search/:postId" element={<SearchPage />} />
           <Route path="/search/*" element={<SearchPage />} />
+          <Route path="/info" element={<InfoPage />} />
         </Routes>
       </BrowserRouter>
     </ThemeProvider>

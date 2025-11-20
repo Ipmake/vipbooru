@@ -74,6 +74,7 @@ const ImagePreviewDrawer: React.FC = () => {
           display: "flex",
           flexDirection: "column",
           maxHeight: "100%",
+          WebkitOverflowScrolling: "touch",
         },
       }}
     >
@@ -85,8 +86,8 @@ const ImagePreviewDrawer: React.FC = () => {
               <Box
                 sx={{
                   position: "relative",
-                  height: "50%",
-                  minHeight: "300px",
+                  height: { xs: "40%", sm: "50%" },
+                  minHeight: { xs: "200px", sm: "300px" },
                   overflow: "hidden",
                   backgroundColor: "rgba(18, 18, 18, 0.95)",
                   display: "flex",
@@ -102,8 +103,10 @@ const ImagePreviewDrawer: React.FC = () => {
                   size="small"
                   sx={{
                     position: "absolute",
-                    top: 16,
-                    right: 16,
+                    top: { xs: 12, sm: 16 },
+                    right: { xs: 12, sm: 16 },
+                    width: { xs: 40, sm: 36 },
+                    height: { xs: 40, sm: 36 },
                     backgroundColor: "rgba(30, 30, 30, 0.5)",
                     color: "#e0e0e0",
                     border: "1px solid rgba(255, 255, 255, 0.05)",
@@ -183,17 +186,31 @@ const ImagePreviewDrawer: React.FC = () => {
                 </IconButton>
 
                 {/* Image */}
-                <img
-                  src={post.large_file_url || post.file_url}
-                  alt={`Image ${post.id}`}
-                  style={{
-                    maxWidth: "100%",
-                    maxHeight: "100%",
-                    objectFit: "contain",
-                    display: "block",
-                  }}
-                  loading="lazy"
-                />
+                  {post.file_ext === "webm" || post.file_ext === "mp4" ? (
+                  <video
+                    src={post.large_file_url || post.file_url}
+                    style={{
+                      maxWidth: "100%",
+                      maxHeight: "100%",
+                      objectFit: "contain",
+                      display: "block",
+                    }}
+                    controls
+                    preload="metadata"
+                  />
+                  ) : (
+                  <img
+                    src={post.large_file_url || post.file_url}
+                    alt={`Image ${post.id}`}
+                    style={{
+                      maxWidth: "100%",
+                      maxHeight: "100%",
+                      objectFit: "contain",
+                      display: "block",
+                    }}
+                    loading="lazy"
+                  />
+                  )}
               </Box>
 
               {/* Image details section */}
