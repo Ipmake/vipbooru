@@ -23,14 +23,19 @@ function InfoPage() {
   const navigate = useNavigate();
   const [apiKey, setApiKey] = React.useState("");
   const [username, setUsername] = React.useState("");
-  const [imageLoading, setImageLoading] = React.useState<"lazy" | "eager">("lazy");
+  const [imageLoading, setImageLoading] = React.useState<"lazy" | "eager">(
+    "lazy"
+  );
   const [saved, setSaved] = React.useState(false);
 
   // Load saved settings on mount
   React.useEffect(() => {
     const savedApiKey = localStorage.getItem("danbooru_api_key");
     const savedUsername = localStorage.getItem("danbooru_username");
-    const savedImageLoading = localStorage.getItem("image_loading") as "lazy" | "eager" | null;
+    const savedImageLoading = localStorage.getItem("image_loading") as
+      | "lazy"
+      | "eager"
+      | null;
     if (savedApiKey) setApiKey(savedApiKey);
     if (savedUsername) setUsername(savedUsername);
     if (savedImageLoading) setImageLoading(savedImageLoading);
@@ -83,8 +88,8 @@ function InfoPage() {
       <Box sx={{ display: "flex", alignItems: "center", mb: { xs: 2, sm: 3 } }}>
         <IconButton
           onClick={() => navigate(-1)}
-          sx={{ 
-            mr: { xs: 1, sm: 2 }, 
+          sx={{
+            mr: { xs: 1, sm: 2 },
             color: "primary.main",
             width: { xs: 40, sm: 48 },
             height: { xs: 40, sm: 48 },
@@ -92,7 +97,11 @@ function InfoPage() {
         >
           <ArrowBack />
         </IconButton>
-        <Typography variant="h4" fontWeight="bold" sx={{ fontSize: { xs: "1.5rem", sm: "2.125rem" } }}>
+        <Typography
+          variant="h4"
+          fontWeight="bold"
+          sx={{ fontSize: { xs: "1.5rem", sm: "2.125rem" } }}
+        >
           Info & Settings
         </Typography>
       </Box>
@@ -107,33 +116,43 @@ function InfoPage() {
             borderRadius: 2,
           }}
         >
-          <Typography variant="h5" gutterBottom fontWeight="bold" sx={{ fontSize: { xs: "1.25rem", sm: "1.5rem" } }}>
+          <Typography
+            variant="h5"
+            gutterBottom
+            fontWeight="bold"
+            sx={{ fontSize: { xs: "1.25rem", sm: "1.5rem" } }}
+          >
             About VipBooru
           </Typography>
-          <Typography variant="body1" paragraph color="text.secondary" sx={{ fontSize: { xs: "0.9rem", sm: "1rem" } }}>
-            VipBooru is a modern, fast alternative interface for browsing Danbooru.
-            Long story short, I got tired of Danbooru's clunky and outdates "1990s ahhh" interface,
-            so I made my own. 
+          <Typography
+            variant="body1"
+            paragraph
+            color="text.secondary"
+            sx={{ fontSize: { xs: "0.9rem", sm: "1rem" } }}
+          >
+            VipBooru is a modern, fast alternative interface for browsing
+            Danbooru. Long story short, I got tired of Danbooru's clunky and
+            outdates "1990s ahhh" interface, so I made my own.
           </Typography>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
-            <Avatar 
+            <Avatar
               src="https://kllfkvpwiqiwvauovdmw.supabase.co/storage/v1/object/public/assets/other/logo.png"
               alt="Ipmake"
               sx={{ width: 24, height: 24 }}
             />
             <Typography variant="body2" color="text.secondary">
               Created by{" "}
-              <Link 
-                href="https://ipmake.dev" 
-                target="_blank" 
+              <Link
+                href="https://ipmake.dev"
+                target="_blank"
                 rel="noopener noreferrer"
-                sx={{ 
-                  color: "text.secondary", 
+                sx={{
+                  color: "text.secondary",
                   textDecoration: "none",
                   fontWeight: "bold",
                   "&:hover": {
-                    textDecoration: "underline"
-                  }
+                    textDecoration: "underline",
+                  },
                 }}
               >
                 Ipmake
@@ -143,17 +162,17 @@ function InfoPage() {
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             <Typography variant="body2" color="text.secondary">
               Support me on{" "}
-              <Link 
-                href="https://ko-fi.com/ipmake" 
-                target="_blank" 
+              <Link
+                href="https://ko-fi.com/ipmake"
+                target="_blank"
                 rel="noopener noreferrer"
-                sx={{ 
-                  color: "text.secondary", 
+                sx={{
+                  color: "text.secondary",
                   textDecoration: "none",
                   fontWeight: "bold",
                   "&:hover": {
-                    textDecoration: "underline"
-                  }
+                    textDecoration: "underline",
+                  },
                 }}
               >
                 Ko-fi ☕
@@ -170,10 +189,20 @@ function InfoPage() {
             borderRadius: 2,
           }}
         >
-          <Typography variant="h5" gutterBottom fontWeight="bold" sx={{ fontSize: { xs: "1.25rem", sm: "1.5rem" } }}>
+          <Typography
+            variant="h5"
+            gutterBottom
+            fontWeight="bold"
+            sx={{ fontSize: { xs: "1.25rem", sm: "1.5rem" } }}
+          >
             Danbooru API Settings
           </Typography>
-          <Typography variant="body2" color="text.secondary" paragraph sx={{ fontSize: { xs: "0.85rem", sm: "0.875rem" } }}>
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            paragraph
+            sx={{ fontSize: { xs: "0.85rem", sm: "0.875rem" } }}
+          >
             Optional: Provide your Danbooru API credentials to access your
             favorites and increase rate limits. Your credentials are stored
             locally in your browser.
@@ -182,7 +211,10 @@ function InfoPage() {
           <Divider sx={{ my: 2 }} />
 
           {saved && (
-            <Alert severity="success" sx={{ mb: 2, fontSize: { xs: "0.85rem", sm: "0.875rem" } }}>
+            <Alert
+              severity="success"
+              sx={{ mb: 2, fontSize: { xs: "0.85rem", sm: "0.875rem" } }}
+            >
               Settings saved successfully!
             </Alert>
           )}
@@ -195,7 +227,7 @@ function InfoPage() {
             sx={{ mb: 2 }}
             helperText="Your Danbooru account username"
             InputProps={{
-              sx: { fontSize: { xs: "0.9rem", sm: "1rem" } }
+              sx: { fontSize: { xs: "0.9rem", sm: "1rem" } },
             }}
           />
 
@@ -208,13 +240,18 @@ function InfoPage() {
             sx={{ mb: 3 }}
             helperText="Your Danbooru API key from your account settings"
             InputProps={{
-              sx: { fontSize: { xs: "0.9rem", sm: "1rem" } }
+              sx: { fontSize: { xs: "0.9rem", sm: "1rem" } },
             }}
           />
 
           <Divider sx={{ my: 3 }} />
 
-          <Typography variant="h6" gutterBottom fontWeight="bold" sx={{ fontSize: { xs: "1.1rem", sm: "1.25rem" } }}>
+          <Typography
+            variant="h6"
+            gutterBottom
+            fontWeight="bold"
+            sx={{ fontSize: { xs: "1.1rem", sm: "1.25rem" } }}
+          >
             Display Settings
           </Typography>
 
@@ -224,36 +261,49 @@ function InfoPage() {
               labelId="image-loading-label"
               value={imageLoading}
               label="Image Loading"
-              onChange={(e) => setImageLoading(e.target.value as "lazy" | "eager")}
+              onChange={(e) =>
+                setImageLoading(e.target.value as "lazy" | "eager")
+              }
               sx={{ fontSize: { xs: "0.9rem", sm: "1rem" } }}
             >
-              <MenuItem value="lazy">Lazy (Load as needed - Recommended)</MenuItem>
-              <MenuItem value="eager">Eager (Load all immediately - May cause rate limiting)</MenuItem>
+              <MenuItem value="lazy">
+                Lazy (Load as needed - Recommended)
+              </MenuItem>
+              <MenuItem value="eager">
+                Eager (Load all immediately - May cause rate limiting)
+              </MenuItem>
             </Select>
             <FormHelperText sx={{ fontSize: { xs: "0.8rem", sm: "0.875rem" } }}>
-              Lazy loading improves performance by only loading images as you scroll. 
-              Eager loading provides a smoother experience but may cause you to be rate-limited.
+              Lazy loading improves performance by only loading images as you
+              scroll. Eager loading provides a smoother experience but may cause
+              you to be rate-limited.
             </FormHelperText>
           </FormControl>
 
-          <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, gap: 2 }}>
-            <Button 
-              variant="contained" 
-              onClick={handleSave} 
-              sx={{ 
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: { xs: "column", sm: "row" },
+              gap: 2,
+            }}
+          >
+            <Button
+              variant="contained"
+              onClick={handleSave}
+              sx={{
                 flex: 1,
                 height: { xs: "44px", sm: "auto" },
-                fontSize: { xs: "0.95rem", sm: "0.875rem" }
+                fontSize: { xs: "0.95rem", sm: "0.875rem" },
               }}
             >
               Save Settings
             </Button>
-            <Button 
-              variant="outlined" 
+            <Button
+              variant="outlined"
               onClick={handleClear}
               sx={{
                 height: { xs: "44px", sm: "auto" },
-                fontSize: { xs: "0.95rem", sm: "0.875rem" }
+                fontSize: { xs: "0.95rem", sm: "0.875rem" },
               }}
             >
               Clear
@@ -279,7 +329,12 @@ function InfoPage() {
             borderRadius: 2,
           }}
         >
-          <Typography variant="h6" gutterBottom fontWeight="bold" sx={{ fontSize: { xs: "1.1rem", sm: "1.25rem" } }}>
+          <Typography
+            variant="h6"
+            gutterBottom
+            fontWeight="bold"
+            sx={{ fontSize: { xs: "1.1rem", sm: "1.25rem" } }}
+          >
             Useful Links
           </Typography>
           <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
@@ -288,10 +343,10 @@ function InfoPage() {
               href="https://danbooru.donmai.us/"
               target="_blank"
               rel="noopener noreferrer"
-              sx={{ 
+              sx={{
                 justifyContent: "flex-start",
                 height: { xs: "44px", sm: "auto" },
-                fontSize: { xs: "0.9rem", sm: "0.875rem" }
+                fontSize: { xs: "0.9rem", sm: "0.875rem" },
               }}
             >
               Danbooru Official Site
@@ -301,10 +356,10 @@ function InfoPage() {
               href="https://danbooru.donmai.us/wiki_pages/help:api"
               target="_blank"
               rel="noopener noreferrer"
-              sx={{ 
+              sx={{
                 justifyContent: "flex-start",
                 height: { xs: "44px", sm: "auto" },
-                fontSize: { xs: "0.9rem", sm: "0.875rem" }
+                fontSize: { xs: "0.9rem", sm: "0.875rem" },
               }}
             >
               Danbooru API Documentation
@@ -314,10 +369,10 @@ function InfoPage() {
               href="https://github.com/Ipmake/vipbooru"
               target="_blank"
               rel="noopener noreferrer"
-              sx={{ 
+              sx={{
                 justifyContent: "flex-start",
                 height: { xs: "44px", sm: "auto" },
-                fontSize: { xs: "0.9rem", sm: "0.875rem" }
+                fontSize: { xs: "0.9rem", sm: "0.875rem" },
               }}
             >
               GitHub Repository
