@@ -28,7 +28,7 @@ const MasonryItem = styled(Box)(({ theme }) => ({
     transform: "scale(0.98)",
   },
 
-  [theme.breakpoints.down('sm')]: {
+  [theme.breakpoints.down("sm")]: {
     borderRadius: "8px",
     "&:hover": {
       transform: "none",
@@ -60,7 +60,7 @@ const MasonryGrid: React.FC<MasonryGridProps> = ({
   const [containerWidth, setContainerWidth] = React.useState(0);
   const [scrollTop, setScrollTop] = React.useState(0);
   const [containerHeight, setContainerHeight] = React.useState(0);
-  
+
   // Only keep refs for visible items
   const visibleImageRefs = React.useRef<Map<string, HTMLDivElement>>(new Map());
   const itemHeightsRef = React.useRef<Map<number, number>>(new Map());
@@ -70,7 +70,7 @@ const MasonryGrid: React.FC<MasonryGridProps> = ({
 
   // Responsive column width based on screen size
   const getColumnWidth = () => {
-    if (typeof window === 'undefined') return 300;
+    if (typeof window === "undefined") return 300;
     const width = window.innerWidth;
     if (width < 600) return 140; // Mobile - 2-3 columns
     if (width < 960) return 220; // Tablet - 3-4 columns
@@ -146,41 +146,53 @@ const MasonryGrid: React.FC<MasonryGridProps> = ({
   }, [scrollableRef]);
 
   // Optimized image load handler - batch updates
+  const recalcTimeoutRef = useRef<number | null>(null);
+
   const handleImageLoad = useCallback(
     (index: number, uniqueKey: string) => {
       const element = visibleImageRefs.current.get(uniqueKey);
       if (element) {
         const height = element.offsetHeight;
         const currentHeight = itemHeightsRef.current.get(index);
-        
+
         if (currentHeight !== height && height > 0) {
           itemHeightsRef.current.set(index, height);
           needsRecalc.current = true;
-          
-          // Immediately trigger layout recalculation for early items to prevent overlap
-          // For items in the first few rows, update immediately to avoid collapse
-          if (index < columnCount * 3) {
+
+          // For early items (first few rows), recalculate immediately to prevent overlap
+          if (index < columnCount * 4) {
+            // Clear any pending timeout
+            if (recalcTimeoutRef.current !== null) {
+              clearTimeout(recalcTimeoutRef.current);
+              recalcTimeoutRef.current = null;
+            }
             needsRecalc.current = false;
-            setLayoutVersion(v => v + 1);
+            setLayoutVersion((v) => v + 1);
           } else {
-            // Debounce layout recalculation for later items
-            requestAnimationFrame(() => {
+            // For later items, debounce to batch multiple updates
+            if (recalcTimeoutRef.current !== null) {
+              clearTimeout(recalcTimeoutRef.current);
+            }
+            recalcTimeoutRef.current = window.setTimeout(() => {
               if (needsRecalc.current) {
                 needsRecalc.current = false;
-                setLayoutVersion(v => v + 1);
+                setLayoutVersion((v) => v + 1);
               }
-            });
+              recalcTimeoutRef.current = null;
+            }, 50);
           }
         }
       }
     },
     [columnCount]
   );
-
   // Calculate positions with caching
   const positions = useMemo(() => {
     // Use cache if available and no recalc needed
-    if (positionsCache.current.length === posts.length && !needsRecalc.current) {
+    if (
+      positionsCache.current.length === posts.length &&
+      !needsRecalc.current
+    ) {
       return positionsCache.current;
     }
 
@@ -210,10 +222,16 @@ const MasonryGrid: React.FC<MasonryGridProps> = ({
 
     positionsCache.current = positions;
     needsRecalc.current = false;
-    
+
     return positions;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [posts.length, columnCount, actualColumnWidth, columnGutter, layoutVersion]);
+  }, [
+    posts.length,
+    columnCount,
+    actualColumnWidth,
+    columnGutter,
+    layoutVersion,
+  ]);
 
   const totalHeight = useMemo(() => {
     if (positions.length === 0) return 0;
@@ -226,7 +244,11 @@ const MasonryGrid: React.FC<MasonryGridProps> = ({
     const startY = Math.max(0, scrollTop - overscan);
     const endY = scrollTop + containerHeight + overscan;
 
-    const visible: Array<{ pos: ItemPosition; index: number; post: DanbooruPost }> = [];
+    const visible: Array<{
+      pos: ItemPosition;
+      index: number;
+      post: DanbooruPost;
+    }> = [];
 
     for (let i = 0; i < positions.length; i++) {
       const pos = positions[i];
@@ -241,7 +263,7 @@ const MasonryGrid: React.FC<MasonryGridProps> = ({
     if (visible.length > 0) {
       const lastIndex = visible[visible.length - 1].index;
       const preloadCount = Math.min(20, posts.length - lastIndex - 1);
-      
+
       for (let i = 1; i <= preloadCount; i++) {
         const idx = lastIndex + i;
         if (positions[idx]) {
@@ -256,7 +278,9 @@ const MasonryGrid: React.FC<MasonryGridProps> = ({
   // Aggressive cleanup of refs
   React.useEffect(() => {
     const visibleKeys = new Set(
-      visibleItems.map(({ post }) => `${post.id}-${new Date(post.created_at).getTime()}`)
+      visibleItems.map(
+        ({ post }) => `${post.id}-${new Date(post.created_at).getTime()}`
+      )
     );
 
     // Keep only visible refs
@@ -266,8 +290,8 @@ const MasonryGrid: React.FC<MasonryGridProps> = ({
         keysToDelete.push(key);
       }
     });
-    
-    keysToDelete.forEach(key => visibleImageRefs.current.delete(key));
+
+    keysToDelete.forEach((key) => visibleImageRefs.current.delete(key));
   }, [visibleItems]);
 
   // Cleanup heights for removed posts
@@ -275,14 +299,14 @@ const MasonryGrid: React.FC<MasonryGridProps> = ({
     if (itemHeightsRef.current.size > posts.length * 1.5) {
       const validIndices = new Set(posts.map((_, i) => i));
       const heightsToDelete: number[] = [];
-      
+
       itemHeightsRef.current.forEach((_, index) => {
         if (!validIndices.has(index)) {
           heightsToDelete.push(index);
         }
       });
-      
-      heightsToDelete.forEach(index => itemHeightsRef.current.delete(index));
+
+      heightsToDelete.forEach((index) => itemHeightsRef.current.delete(index));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [posts.length]);
@@ -305,9 +329,14 @@ const MasonryGrid: React.FC<MasonryGridProps> = ({
           display: { xs: "none", md: "block" },
         }}
       >
-        <Typography variant="body2" color="textSecondary" fontFamily="monospace">
-          Pos: {scrollTop} | Items: {posts.length} | Rendered: {visibleItems.length} | 
-          Page: {Math.ceil(posts.length / 100)} | Refs: {visibleImageRefs.current.size}
+        <Typography
+          variant="body2"
+          color="textSecondary"
+          fontFamily="monospace"
+        >
+          Pos: {scrollTop} | Items: {posts.length} | Rendered:{" "}
+          {visibleItems.length} | Page: {Math.ceil(posts.length / 100)} | Refs:{" "}
+          {visibleImageRefs.current.size}
         </Typography>
       </Box>
 
@@ -374,7 +403,9 @@ const ImageGrid = () => {
   const [loading, setLoading] = React.useState<boolean>(false);
   const [page, setPage] = React.useState<number>(1);
   const [hasMore, setHasMore] = React.useState<boolean>(true);
-  const [imageLoading, setImageLoading] = React.useState<"lazy" | "eager">("lazy");
+  const [imageLoading, setImageLoading] = React.useState<"lazy" | "eager">(
+    "lazy"
+  );
   const scrollableRef = React.useRef<HTMLDivElement>(null);
   const loadingRef = React.useRef(false);
 
@@ -383,7 +414,10 @@ const ImageGrid = () => {
 
   // Load image loading preference
   React.useEffect(() => {
-    const savedImageLoading = localStorage.getItem("image_loading") as "lazy" | "eager" | null;
+    const savedImageLoading = localStorage.getItem("image_loading") as
+      | "lazy"
+      | "eager"
+      | null;
     if (savedImageLoading) {
       setImageLoading(savedImageLoading);
     }
@@ -476,7 +510,9 @@ const ImageGrid = () => {
       }
     };
 
-    scrollableDiv.addEventListener("scroll", throttledScroll, { passive: true });
+    scrollableDiv.addEventListener("scroll", throttledScroll, {
+      passive: true,
+    });
     return () => {
       if (rafId !== null) cancelAnimationFrame(rafId);
       scrollableDiv.removeEventListener("scroll", throttledScroll);
@@ -501,10 +537,10 @@ const ImageGrid = () => {
         overflowX: "hidden",
         WebkitOverflowScrolling: "touch",
         scrollbarWidth: "thin",
-        "&::-webkit-scrollbar": { 
+        "&::-webkit-scrollbar": {
           width: { xs: "2px", sm: "4px" },
         },
-        "&::-webkit-scrollbar-track": { 
+        "&::-webkit-scrollbar-track": {
           background: "rgba(30, 30, 30, 0.2)",
         },
         "&::-webkit-scrollbar-thumb": {
@@ -528,19 +564,42 @@ const ImageGrid = () => {
       )}
 
       {loading && posts.length === 0 && (
-        <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "50vh" }}>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            height: "50vh",
+          }}
+        >
           <CircularProgress size={60} thickness={4} />
         </Box>
       )}
 
       {loading && posts.length > 0 && (
-        <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", py: 4 }}>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            py: 4,
+          }}
+        >
           <CircularProgress size={40} thickness={4} />
         </Box>
       )}
 
       {!loading && !hasMore && posts.length > 0 && (
-        <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", py: 4, color: "text.secondary", fontSize: "0.875rem" }}>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            py: 4,
+            color: "text.secondary",
+            fontSize: "0.875rem",
+          }}
+        >
           No more images to load
         </Box>
       )}

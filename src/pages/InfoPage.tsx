@@ -13,6 +13,8 @@ import {
   FormControl,
   InputLabel,
   FormHelperText,
+  Avatar,
+  Link,
 } from "@mui/material";
 import { ArrowBack } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
@@ -109,16 +111,55 @@ function InfoPage() {
             About VipBooru
           </Typography>
           <Typography variant="body1" paragraph color="text.secondary" sx={{ fontSize: { xs: "0.9rem", sm: "1rem" } }}>
-            VipBooru is a modern, fast image browsing interface for Danbooru.
-            Built with React, TypeScript, and Material-UI for a smooth and
-            responsive experience.
+            VipBooru is a modern, fast alternative interface for browsing Danbooru.
+            Long story short, I got tired of Danbooru's clunky and outdates "1990s ahhh" interface,
+            so I made my own. 
           </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Created by <strong>@Ipmake</strong>
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            Version 1.0.0
-          </Typography>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+            <Avatar 
+              src="https://kllfkvpwiqiwvauovdmw.supabase.co/storage/v1/object/public/assets/other/logo.png"
+              alt="Ipmake"
+              sx={{ width: 24, height: 24 }}
+            />
+            <Typography variant="body2" color="text.secondary">
+              Created by{" "}
+              <Link 
+                href="https://ipmake.dev" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                sx={{ 
+                  color: "text.secondary", 
+                  textDecoration: "none",
+                  fontWeight: "bold",
+                  "&:hover": {
+                    textDecoration: "underline"
+                  }
+                }}
+              >
+                Ipmake
+              </Link>
+            </Typography>
+          </Box>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              Support me on{" "}
+              <Link 
+                href="https://ko-fi.com/ipmake" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                sx={{ 
+                  color: "text.secondary", 
+                  textDecoration: "none",
+                  fontWeight: "bold",
+                  "&:hover": {
+                    textDecoration: "underline"
+                  }
+                }}
+              >
+                Ko-fi ☕
+              </Link>
+            </Typography>
+          </Box>
         </Paper>
 
         {/* Settings Section */}
