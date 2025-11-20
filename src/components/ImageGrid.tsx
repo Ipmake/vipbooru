@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useMemo } from "react";
+import React, { useRef, useCallback, useMemo, useEffect } from "react";
 import { Box, Chip, CircularProgress, Typography } from "@mui/material";
 import type { DanbooruPost } from "../types";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -61,20 +61,20 @@ const MasonryGrid: React.FC<MasonryGridProps> = ({
   const [scrollTop, setScrollTop] = React.useState(0);
   const [containerHeight, setContainerHeight] = React.useState(0);
 
-  // Only keep refs for visible items
   const visibleImageRefs = React.useRef<Map<string, HTMLDivElement>>(new Map());
   const itemHeightsRef = React.useRef<Map<number, number>>(new Map());
+  const loadedImagesRef = React.useRef<Set<number>>(new Set());
   const positionsCache = React.useRef<ItemPosition[]>([]);
-  const needsRecalc = React.useRef(false);
   const [layoutVersion, setLayoutVersion] = React.useState(0);
+  const pendingRecalcRef = React.useRef(false);
 
   // Responsive column width based on screen size
   const getColumnWidth = () => {
     if (typeof window === "undefined") return 300;
     const width = window.innerWidth;
-    if (width < 600) return 140; // Mobile - 2-3 columns
-    if (width < 960) return 220; // Tablet - 3-4 columns
-    return 300; // Desktop
+    if (width < 600) return 140;
+    if (width < 960) return 220;
+    return 300;
   };
 
   const columnWidth = getColumnWidth();
@@ -90,6 +90,17 @@ const MasonryGrid: React.FC<MasonryGridProps> = ({
 
   const listContainerRef = useRef<HTMLElement>(null);
 
+  // Reset everything when posts change
+  useEffect(() => {
+    if (posts.length === 0) {
+      itemHeightsRef.current.clear();
+      loadedImagesRef.current.clear();
+      positionsCache.current = [];
+      pendingRecalcRef.current = false;
+      setLayoutVersion((v) => v + 1);
+    }
+  }, [posts.length]);
+
   // Track container dimensions
   React.useEffect(() => {
     const element = listContainerRef.current;
@@ -97,9 +108,13 @@ const MasonryGrid: React.FC<MasonryGridProps> = ({
 
     const updateDimensions = () => {
       const newWidth = element.clientWidth;
-      if (newWidth !== containerWidth) {
+      if (newWidth !== containerWidth && newWidth > 0) {
         setContainerWidth(newWidth);
-        needsRecalc.current = true;
+        // Clear positions cache when width changes
+        positionsCache.current = [];
+        loadedImagesRef.current.clear();
+        itemHeightsRef.current.clear();
+        setLayoutVersion((v) => v + 1);
       }
     };
 
@@ -145,53 +160,48 @@ const MasonryGrid: React.FC<MasonryGridProps> = ({
     };
   }, [scrollableRef]);
 
-  // Optimized image load handler - batch updates
-  const recalcTimeoutRef = useRef<number | null>(null);
+  // Debounced layout recalculation
+  const scheduleRecalc = useCallback(() => {
+    if (pendingRecalcRef.current) return;
 
+    pendingRecalcRef.current = true;
+    requestAnimationFrame(() => {
+      pendingRecalcRef.current = false;
+      positionsCache.current = [];
+      setLayoutVersion((v) => v + 1);
+    });
+  }, []);
+
+  // Optimized image load handler
   const handleImageLoad = useCallback(
-    (index: number, uniqueKey: string) => {
-      const element = visibleImageRefs.current.get(uniqueKey);
-      if (element) {
-        const height = element.offsetHeight;
-        const currentHeight = itemHeightsRef.current.get(index);
+    (index: number, uniqueKey: string, imgElement: HTMLImageElement) => {
+      // Skip if already processed
+      if (loadedImagesRef.current.has(index)) return;
 
-        if (currentHeight !== height && height > 0) {
-          itemHeightsRef.current.set(index, height);
-          needsRecalc.current = true;
+      const containerElement = visibleImageRefs.current.get(uniqueKey);
+      if (!containerElement || !imgElement.naturalHeight) return;
 
-          // For early items (first few rows), recalculate immediately to prevent overlap
-          if (index < columnCount * 4) {
-            // Clear any pending timeout
-            if (recalcTimeoutRef.current !== null) {
-              clearTimeout(recalcTimeoutRef.current);
-              recalcTimeoutRef.current = null;
-            }
-            needsRecalc.current = false;
-            setLayoutVersion((v) => v + 1);
-          } else {
-            // For later items, debounce to batch multiple updates
-            if (recalcTimeoutRef.current !== null) {
-              clearTimeout(recalcTimeoutRef.current);
-            }
-            recalcTimeoutRef.current = window.setTimeout(() => {
-              if (needsRecalc.current) {
-                needsRecalc.current = false;
-                setLayoutVersion((v) => v + 1);
-              }
-              recalcTimeoutRef.current = null;
-            }, 50);
-          }
-        }
+      // Use natural dimensions for accurate height
+      const aspectRatio = imgElement.naturalHeight / imgElement.naturalWidth;
+      const actualHeight = Math.floor(actualColumnWidth * aspectRatio);
+
+      // Only update if height is valid and different
+      const currentHeight = itemHeightsRef.current.get(index);
+      if (actualHeight > 0 && currentHeight !== actualHeight) {
+        itemHeightsRef.current.set(index, actualHeight);
+        loadedImagesRef.current.add(index);
+        scheduleRecalc();
       }
     },
-    [columnCount]
+    [actualColumnWidth, scheduleRecalc]
   );
-  // Calculate positions with caching
+
+  // Calculate positions with better estimation
   const positions = useMemo(() => {
-    // Use cache if available and no recalc needed
+    // Only use cache if we have positions for all current posts
     if (
       positionsCache.current.length === posts.length &&
-      !needsRecalc.current
+      positionsCache.current.length > 0
     ) {
       return positionsCache.current;
     }
@@ -205,33 +215,32 @@ const MasonryGrid: React.FC<MasonryGridProps> = ({
       const left = shortestColumn * (actualColumnWidth + columnGutter);
       const top = columnHeights[shortestColumn];
 
+      // Get height from loaded images or estimate
       let height = itemHeightsRef.current.get(index);
-      if (!height) {
-        if (post.image_width && post.image_height) {
-          const aspectRatio = post.image_height / post.image_width;
-          height = actualColumnWidth * aspectRatio;
-        } else {
-          // Use a more reasonable default height
-          height = actualColumnWidth * 1.2; // Assume roughly portrait orientation
-        }
+
+      if (!height && post.image_width && post.image_height) {
+        // Use post dimensions for better estimation
+        const aspectRatio = post.image_height / post.image_width;
+        height = Math.floor(actualColumnWidth * aspectRatio);
+
+        // Set minimum height to prevent collapse
+        height = Math.max(height, actualColumnWidth * 0.5);
+      } else if (!height) {
+        // Fallback with reasonable minimum
+        height = actualColumnWidth * 1.2;
       }
 
       positions.push({ top, left, height, column: shortestColumn });
       columnHeights[shortestColumn] += height + columnGutter;
     }
 
-    positionsCache.current = positions;
-    needsRecalc.current = false;
+    // Only cache if we have content
+    if (positions.length > 0) {
+      positionsCache.current = positions;
+    }
 
     return positions;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    posts.length,
-    columnCount,
-    actualColumnWidth,
-    columnGutter,
-    layoutVersion,
-  ]);
+  }, [posts, columnCount, actualColumnWidth, columnGutter, layoutVersion]);
 
   const totalHeight = useMemo(() => {
     if (positions.length === 0) return 0;
@@ -255,14 +264,14 @@ const MasonryGrid: React.FC<MasonryGridProps> = ({
       if (pos.top + pos.height >= startY && pos.top <= endY) {
         visible.push({ pos, index: i, post: posts[i] });
       } else if (pos.top > endY) {
-        break; // Positions are sorted, no need to check further
+        break;
       }
     }
 
     // Preload next items
     if (visible.length > 0) {
       const lastIndex = visible[visible.length - 1].index;
-      const preloadCount = Math.min(20, posts.length - lastIndex - 1);
+      const preloadCount = Math.min(10, posts.length - lastIndex - 1);
 
       for (let i = 1; i <= preloadCount; i++) {
         const idx = lastIndex + i;
@@ -275,7 +284,7 @@ const MasonryGrid: React.FC<MasonryGridProps> = ({
     return visible;
   }, [positions, scrollTop, containerHeight, posts]);
 
-  // Aggressive cleanup of refs
+  // Cleanup refs for non-visible items
   React.useEffect(() => {
     const visibleKeys = new Set(
       visibleItems.map(
@@ -283,7 +292,6 @@ const MasonryGrid: React.FC<MasonryGridProps> = ({
       )
     );
 
-    // Keep only visible refs
     const keysToDelete: string[] = [];
     visibleImageRefs.current.forEach((_, key) => {
       if (!visibleKeys.has(key)) {
@@ -293,23 +301,6 @@ const MasonryGrid: React.FC<MasonryGridProps> = ({
 
     keysToDelete.forEach((key) => visibleImageRefs.current.delete(key));
   }, [visibleItems]);
-
-  // Cleanup heights for removed posts
-  React.useEffect(() => {
-    if (itemHeightsRef.current.size > posts.length * 1.5) {
-      const validIndices = new Set(posts.map((_, i) => i));
-      const heightsToDelete: number[] = [];
-
-      itemHeightsRef.current.forEach((_, index) => {
-        if (!validIndices.has(index)) {
-          heightsToDelete.push(index);
-        }
-      });
-
-      heightsToDelete.forEach((index) => itemHeightsRef.current.delete(index));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [posts.length]);
 
   return (
     <Box
@@ -335,7 +326,7 @@ const MasonryGrid: React.FC<MasonryGridProps> = ({
           fontFamily="monospace"
         >
           Pos: {scrollTop} | Items: {posts.length} | Rendered:{" "}
-          {visibleItems.length} | Page: {Math.ceil(posts.length / 100)} | Refs:{" "}
+          {visibleItems.length} | Loaded: {loadedImagesRef.current.size} | Refs:{" "}
           {visibleImageRefs.current.size}
         </Typography>
       </Box>
@@ -355,6 +346,7 @@ const MasonryGrid: React.FC<MasonryGridProps> = ({
               top: pos.top + columnGutter,
               left: pos.left,
               width: actualColumnWidth,
+              minHeight: pos.height,
             }}
           >
             {(post.file_ext === "webm" || post.file_ext === "mp4") && (
@@ -382,7 +374,7 @@ const MasonryGrid: React.FC<MasonryGridProps> = ({
               }
               alt={post.tag_string}
               loading={imageLoading}
-              onLoad={() => handleImageLoad(index, uniqueKey)}
+              onLoad={(e) => handleImageLoad(index, uniqueKey, e.currentTarget)}
               style={{
                 width: "100%",
                 height: "auto",
@@ -429,7 +421,7 @@ const ImageGrid = () => {
     setPage(1);
     setHasMore(true);
     setPosts([]);
-    scrollableRef.current?.scrollTo({ top: 0 });
+    scrollableRef.current?.scrollTo({ top: 0, behavior: "auto" });
 
     danbooruService
       .fetchPosts(tags?.split(",") || [], 1, 100)
