@@ -157,17 +157,24 @@ const MasonryGrid: React.FC<MasonryGridProps> = ({
           itemHeightsRef.current.set(index, height);
           needsRecalc.current = true;
           
-          // Debounce layout recalculation
-          requestAnimationFrame(() => {
-            if (needsRecalc.current) {
-              needsRecalc.current = false;
-              setLayoutVersion(v => v + 1);
-            }
-          });
+          // Immediately trigger layout recalculation for early items to prevent overlap
+          // For items in the first few rows, update immediately to avoid collapse
+          if (index < columnCount * 3) {
+            needsRecalc.current = false;
+            setLayoutVersion(v => v + 1);
+          } else {
+            // Debounce layout recalculation for later items
+            requestAnimationFrame(() => {
+              if (needsRecalc.current) {
+                needsRecalc.current = false;
+                setLayoutVersion(v => v + 1);
+              }
+            });
+          }
         }
       }
     },
-    []
+    [columnCount]
   );
 
   // Calculate positions with caching
@@ -187,11 +194,14 @@ const MasonryGrid: React.FC<MasonryGridProps> = ({
       const top = columnHeights[shortestColumn];
 
       let height = itemHeightsRef.current.get(index);
-      if (!height && post.image_width && post.image_height) {
-        const aspectRatio = post.image_height / post.image_width;
-        height = actualColumnWidth * aspectRatio;
-      } else if (!height) {
-        height = 400;
+      if (!height) {
+        if (post.image_width && post.image_height) {
+          const aspectRatio = post.image_height / post.image_width;
+          height = actualColumnWidth * aspectRatio;
+        } else {
+          // Use a more reasonable default height
+          height = actualColumnWidth * 1.2; // Assume roughly portrait orientation
+        }
       }
 
       positions.push({ top, left, height, column: shortestColumn });
