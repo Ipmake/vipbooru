@@ -14,13 +14,14 @@ import CloseIcon from "@mui/icons-material/Close";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import DownloadIcon from "@mui/icons-material/Download";
 import type { DanbooruPost } from "../types";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { danbooruService } from "../services/danbooru";
 import { generateFilenameFromTags } from "../utils/filenameUtils";
 import { danbooruUtil } from "../utils/danbooru";
 
 const ImagePreviewDrawer: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [post, setPost] = React.useState<DanbooruPost | null>(null);
   const [loading, setLoading] = React.useState<boolean>(false);
 
@@ -34,7 +35,7 @@ const ImagePreviewDrawer: React.FC = () => {
   const drawerOpen = Boolean(post);
 
   useEffect(() => {
-    if(!postId) {
+    if (!postId) {
       setPost(null);
       setLoading(false);
       return;
@@ -42,11 +43,12 @@ const ImagePreviewDrawer: React.FC = () => {
 
     setLoading(true);
 
-    danbooruService.fetchPostById(Number(postId))
-      .then(fetchedPost => {
+    danbooruService
+      .fetchPostById(Number(postId))
+      .then((fetchedPost) => {
         setPost(fetchedPost);
       })
-      .catch(error => {
+      .catch((error) => {
         console.error("Error fetching post by ID:", error);
         setPost(null);
       })
@@ -56,8 +58,13 @@ const ImagePreviewDrawer: React.FC = () => {
   }, [postId]);
 
   const closeDrawer = () => {
-    navigate(-1)
-  }
+    if (location.key !== 'default') {
+      navigate(-1);
+    } else {
+      const tags = document.location.search;
+      navigate("/search" + tags);
+    }
+  };
 
   return (
     <Drawer
@@ -79,9 +86,24 @@ const ImagePreviewDrawer: React.FC = () => {
       }}
     >
       {!loading && post && (
-        <Box sx={{ p: 0, height: "100%", position: "relative", display: "flex", flexDirection: "column" }}>
+        <Box
+          sx={{
+            p: 0,
+            height: "100%",
+            position: "relative",
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
           <Fade in={true} timeout={300}>
-            <Box sx={{ display: "flex", flexDirection: "column", height: "100%", maxHeight: "100%" }}>
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                height: "100%",
+                maxHeight: "100%",
+              }}
+            >
               {/* Image preview section */}
               <Box
                 sx={{
@@ -93,7 +115,7 @@ const ImagePreviewDrawer: React.FC = () => {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  borderBottom: "1px solid rgba(255, 255, 255, 0.05)"
+                  borderBottom: "1px solid rgba(255, 255, 255, 0.05)",
                 }}
               >
                 {/* Close button */}
@@ -127,7 +149,10 @@ const ImagePreviewDrawer: React.FC = () => {
                     const url = post.file_url;
                     try {
                       const response = await fetch(url);
-                      if (!response.ok) throw new Error(`Network response was not ok: ${response.status}`);
+                      if (!response.ok)
+                        throw new Error(
+                          `Network response was not ok: ${response.status}`,
+                        );
                       const blob = await response.blob();
                       const blobUrl = URL.createObjectURL(blob);
                       const link = document.createElement("a");
@@ -138,7 +163,10 @@ const ImagePreviewDrawer: React.FC = () => {
                       document.body.removeChild(link);
                       URL.revokeObjectURL(blobUrl);
                     } catch (err) {
-                      console.error("Download failed, opening in new tab as fallback:", err);
+                      console.error(
+                        "Download failed, opening in new tab as fallback:",
+                        err,
+                      );
                       // Fallback: open the image in a new tab (download attribute may be ignored for cross-origin URLs)
                       window.open(url, "_blank", "noopener,noreferrer");
                     }
@@ -186,7 +214,7 @@ const ImagePreviewDrawer: React.FC = () => {
                 </IconButton>
 
                 {/* Image */}
-                  {post.file_ext === "webm" || post.file_ext === "mp4" ? (
+                {post.file_ext === "webm" || post.file_ext === "mp4" ? (
                   <video
                     src={post.large_file_url || post.file_url}
                     style={{
@@ -198,7 +226,7 @@ const ImagePreviewDrawer: React.FC = () => {
                     controls
                     preload="metadata"
                   />
-                  ) : (
+                ) : (
                   <img
                     src={post.large_file_url || post.file_url}
                     alt={`Image ${post.id}`}
@@ -210,7 +238,7 @@ const ImagePreviewDrawer: React.FC = () => {
                     }}
                     loading="lazy"
                   />
-                  )}
+                )}
               </Box>
 
               {/* Image details section */}
@@ -219,21 +247,21 @@ const ImagePreviewDrawer: React.FC = () => {
                   p: 2,
                   flex: 1,
                   overflow: "auto",
-                  maxHeight: "50%", 
+                  maxHeight: "50%",
                   backgroundColor: "rgba(18, 18, 18, 0.95)",
                   display: "flex",
                   flexDirection: "column",
                   gap: 2,
                   pb: 6,
-                  '&::-webkit-scrollbar': {
-                    width: '4px',
-                    background: 'rgba(30, 30, 30, 0.2)',
+                  "&::-webkit-scrollbar": {
+                    width: "4px",
+                    background: "rgba(30, 30, 30, 0.2)",
                   },
-                  '&::-webkit-scrollbar-thumb': {
-                    background: 'rgba(160, 160, 160, 0.3)',
-                    borderRadius: '2px',
-                    '&:hover': {
-                      background: 'rgba(160, 160, 160, 0.4)',
+                  "&::-webkit-scrollbar-thumb": {
+                    background: "rgba(160, 160, 160, 0.3)",
+                    borderRadius: "2px",
+                    "&:hover": {
+                      background: "rgba(160, 160, 160, 0.4)",
                     },
                   },
                 }}
@@ -273,7 +301,7 @@ const ImagePreviewDrawer: React.FC = () => {
                   >
                     <Typography
                       variant="body2"
-                      sx={{ 
+                      sx={{
                         color: "rgba(224, 224, 224, 0.75)",
                         fontWeight: 400,
                       }}
@@ -360,11 +388,14 @@ const ImagePreviewDrawer: React.FC = () => {
                           fontWeight: 500,
                         }}
                       >
-                        {new Date(post.created_at).toLocaleDateString(undefined, {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric'
-                        })}
+                        {new Date(post.created_at).toLocaleDateString(
+                          undefined,
+                          {
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                          },
+                        )}
                       </Typography>
                       <Chip
                         size="small"
@@ -383,7 +414,9 @@ const ImagePreviewDrawer: React.FC = () => {
                     </Box>
                   </Box>
 
-                  <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                  <Box
+                    sx={{ display: "flex", justifyContent: "space-between" }}
+                  >
                     <Typography
                       variant="body2"
                       sx={{ color: "rgba(224, 224, 224, 0.75)" }}
@@ -399,19 +432,26 @@ const ImagePreviewDrawer: React.FC = () => {
                         borderRadius: "4px",
                         fontSize: "0.75rem",
                         color: "#FFFFFF",
-                        backgroundColor: post.rating === "s" 
-                          ? "rgba(86, 180, 140, 0.7)" 
-                          : post.rating === "q"
-                          ? "rgba(200, 150, 0, 0.7)"
-                          : "rgba(200, 70, 70, 0.7)",
+                        backgroundColor:
+                          post.rating === "s"
+                            ? "rgba(86, 180, 140, 0.7)"
+                            : post.rating === "q"
+                              ? "rgba(200, 150, 0, 0.7)"
+                              : "rgba(200, 70, 70, 0.7)",
                         border: "none",
                       }}
                     />
                   </Box>
-                  
+
                   {/* Add Artist information */}
                   {post.tag_string_artist && (
-                    <Box sx={{ display: "flex", justifyContent: "space-between", mt: 1.2 }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        mt: 1.2,
+                      }}
+                    >
                       <Typography
                         variant="body2"
                         sx={{ color: "rgba(224, 224, 224, 0.75)" }}
@@ -429,10 +469,16 @@ const ImagePreviewDrawer: React.FC = () => {
                       </Typography>
                     </Box>
                   )}
-                  
+
                   {/* Add Copyright/Source information */}
                   {post.tag_string_copyright && (
-                    <Box sx={{ display: "flex", justifyContent: "space-between", mt: 1.2 }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        mt: 1.2,
+                      }}
+                    >
                       <Typography
                         variant="body2"
                         sx={{ color: "rgba(224, 224, 224, 0.75)" }}
@@ -445,17 +491,23 @@ const ImagePreviewDrawer: React.FC = () => {
                           color: "#e0e0e0",
                           fontWeight: 500,
                           maxWidth: "70%",
-                          textAlign: "right"
+                          textAlign: "right",
                         }}
                       >
                         {post.tag_string_copyright.split(" ").join(", ")}
                       </Typography>
                     </Box>
                   )}
-                  
+
                   {/* Add Character information */}
                   {post.tag_string_character && (
-                    <Box sx={{ display: "flex", justifyContent: "space-between", mt: 1.2 }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        mt: 1.2,
+                      }}
+                    >
                       <Typography
                         variant="body2"
                         sx={{ color: "rgba(224, 224, 224, 0.75)" }}
@@ -468,17 +520,23 @@ const ImagePreviewDrawer: React.FC = () => {
                           color: "#e0e0e0",
                           fontWeight: 500,
                           maxWidth: "70%",
-                          textAlign: "right"
+                          textAlign: "right",
                         }}
                       >
                         {post.tag_string_character.split(" ").join(", ")}
                       </Typography>
                     </Box>
                   )}
-                  
+
                   {/* Add Source URL if available */}
                   {post.source && post.source.trim() !== "" && (
-                    <Box sx={{ display: "flex", justifyContent: "space-between", mt: 1.2 }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        mt: 1.2,
+                      }}
+                    >
                       <Typography
                         variant="body2"
                         sx={{ color: "rgba(224, 224, 224, 0.75)" }}
@@ -494,7 +552,7 @@ const ImagePreviewDrawer: React.FC = () => {
                           textAlign: "right",
                           overflow: "hidden",
                           textOverflow: "ellipsis",
-                          whiteSpace: "nowrap"
+                          whiteSpace: "nowrap",
                         }}
                       >
                         {post.source}
@@ -528,25 +586,27 @@ const ImagePreviewDrawer: React.FC = () => {
                   >
                     Tags
                   </Typography>
-                  <Box sx={{ 
-                    display: "flex", 
-                    flexWrap: "wrap", 
-                    gap: 1,
-                    maxHeight: "300px",
-                    overflowY: "auto",
-                    pr: 1,
-                    '&::-webkit-scrollbar': {
-                      width: '4px',
-                      background: 'rgba(30, 30, 30, 0.2)',
-                    },
-                    '&::-webkit-scrollbar-thumb': {
-                      background: 'rgba(160, 160, 160, 0.3)',
-                      borderRadius: '2px',
-                      '&:hover': {
-                        background: 'rgba(160, 160, 160, 0.4)',
+                  <Box
+                    sx={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 1,
+                      maxHeight: "300px",
+                      overflowY: "auto",
+                      pr: 1,
+                      "&::-webkit-scrollbar": {
+                        width: "4px",
+                        background: "rgba(30, 30, 30, 0.2)",
                       },
-                    },
-                  }}>
+                      "&::-webkit-scrollbar-thumb": {
+                        background: "rgba(160, 160, 160, 0.3)",
+                        borderRadius: "2px",
+                        "&:hover": {
+                          background: "rgba(160, 160, 160, 0.4)",
+                        },
+                      },
+                    }}
+                  >
                     {post.tag_string.split(" ").map((tag) => (
                       <Chip
                         key={tag}
@@ -566,7 +626,7 @@ const ImagePreviewDrawer: React.FC = () => {
                           "&:hover": {
                             backgroundColor: "rgba(70, 70, 70, 0.7)",
                             color: "white",
-                          }
+                          },
                         }}
                       />
                     ))}
