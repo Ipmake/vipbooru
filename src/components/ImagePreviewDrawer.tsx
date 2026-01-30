@@ -24,13 +24,14 @@ const ImagePreviewDrawer: React.FC = () => {
   const location = useLocation();
   const [post, setPost] = React.useState<DanbooruPost | null>(null);
   const [loading, setLoading] = React.useState<boolean>(false);
+  const [isDetailsExpanded, setIsDetailsExpanded] = React.useState<boolean>(false);
 
   const { postId } = useParams<{ postId?: string }>();
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
-  const drawerWidth = isMobile ? "100%" : "70%";
+  const drawerWidth = isMobile ? "100%" : "90%";
 
   const drawerOpen = Boolean(post);
 
@@ -42,6 +43,7 @@ const ImagePreviewDrawer: React.FC = () => {
     }
 
     setLoading(true);
+    setIsDetailsExpanded(false);
 
     danbooruService
       .fetchPostById(Number(postId))
@@ -99,23 +101,27 @@ const ImagePreviewDrawer: React.FC = () => {
             <Box
               sx={{
                 display: "flex",
-                flexDirection: "column",
+                flexDirection: { xs: "column", md: "row" },
                 height: "100%",
                 maxHeight: "100%",
+                position: "relative",
+                overflow: "hidden",
               }}
             >
               {/* Image preview section */}
               <Box
                 sx={{
                   position: "relative",
-                  height: { xs: "40%", sm: "50%" },
-                  minHeight: { xs: "200px", sm: "300px" },
+                  height: "100%",
+                  width: { xs: "100%", md: "auto" },
+                  flex: { md: 1 },
+                  order: { md: 2 },
                   overflow: "hidden",
                   backgroundColor: "rgba(18, 18, 18, 0.95)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  borderBottom: "1px solid rgba(255, 255, 255, 0.05)",
+                  borderLeft: "none",
                 }}
               >
                 {/* Close button */}
@@ -245,14 +251,28 @@ const ImagePreviewDrawer: React.FC = () => {
               <Box
                 sx={{
                   p: 2,
-                  flex: 1,
-                  overflow: "auto",
-                  maxHeight: "50%",
-                  backgroundColor: "rgba(18, 18, 18, 0.95)",
+                  width: { xs: "100%", md: "420px" },
+                  height: {
+                    xs: isDetailsExpanded ? "75%" : "60px",
+                    md: "100%",
+                  },
+                  transition: "height 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                  position: { xs: "absolute", md: "relative" },
+                  bottom: 0,
+                  left: 0,
+                  zIndex: 20,
+                  order: { md: 1 },
+                  overflowY: { xs: isDetailsExpanded ? "auto" : "hidden", md: "auto" },
+                  backgroundColor: { xs: "rgba(20, 20, 20, 0.98)", md: "rgba(18, 18, 18, 0.95)" },
                   display: "flex",
                   flexDirection: "column",
                   gap: 2,
-                  pb: 6,
+                  pb: { xs: 4, md: 6 },
+                  pt: { xs: 4, md: 2 },
+                  borderTopLeftRadius: { xs: 16, md: 0 },
+                  borderTopRightRadius: { xs: 16, md: 0 },
+                  borderTop: { xs: "1px solid rgba(255,255,255,0.1)", md: "none" },
+                  boxShadow: { xs: "0 -4px 20px rgba(0,0,0,0.4)", md: "none" },
                   "&::-webkit-scrollbar": {
                     width: "4px",
                     background: "rgba(30, 30, 30, 0.2)",
@@ -266,6 +286,33 @@ const ImagePreviewDrawer: React.FC = () => {
                   },
                 }}
               >
+                <Box
+                  onClick={() => setIsDetailsExpanded(!isDetailsExpanded)}
+                  sx={{
+                    display: { xs: "flex", md: "none" },
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: "100%",
+                    height: "36px",
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    cursor: "pointer",
+                    zIndex: 25,
+                    "&:active": {
+                      backgroundColor: "rgba(255,255,255,0.05)",
+                    },
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: "48px",
+                      height: "4px",
+                      backgroundColor: "rgba(255,255,255,0.3)",
+                      borderRadius: "2px",
+                    }}
+                  />
+                </Box>
                 <Paper
                   sx={{
                     p: 2,
@@ -569,7 +616,6 @@ const ImagePreviewDrawer: React.FC = () => {
                     background: "rgba(30, 30, 30, 0.7)",
                     border: "1px solid rgba(255, 255, 255, 0.05)",
                     position: "relative",
-                    overflow: "hidden",
                     width: "100%",
                     flexShrink: 0,
                   }}
@@ -591,8 +637,6 @@ const ImagePreviewDrawer: React.FC = () => {
                       display: "flex",
                       flexWrap: "wrap",
                       gap: 1,
-                      maxHeight: "300px",
-                      overflowY: "auto",
                       pr: 1,
                       "&::-webkit-scrollbar": {
                         width: "4px",
