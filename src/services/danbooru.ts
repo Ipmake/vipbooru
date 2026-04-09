@@ -4,6 +4,7 @@ import {
   type AutocompleteResult,
   type BlacklistTagSetting,
   type DanbooruPost,
+  type FetchPostsResult,
 } from '../types';
 
 const normalizeTag = (tag: string): string => tag.trim().toLowerCase();
@@ -90,7 +91,7 @@ api.interceptors.request.use((config) => {
 });
 
 export const danbooruService = {
-    fetchPosts: async (tags: string[], page: number, limit: number) => {
+    fetchPosts: async (tags: string[], page: number, limit: number): Promise<FetchPostsResult> => {
         const response = await api.get<DanbooruPost[]>('/posts.json', {
             params: {
                 tags: tags.join(' '),
@@ -99,14 +100,30 @@ export const danbooruService = {
             }
         });
 
+        const hasMore = response.data.length === limit;
+
         const activeBlacklistTags = getActiveBlacklistTags();
         if (activeBlacklistTags.size === 0) {
-          return response.data;
+          return {
+            posts: response.data,
+            hasMore,
+            page,
+            limit,
+            rawCount: response.data.length,
+          };
         }
 
-        return response.data.filter(
+        const filteredPosts = response.data.filter(
           (post) => !hasBlacklistedTag(post, activeBlacklistTags)
         );
+
+        return {
+          posts: filteredPosts,
+          hasMore,
+          page,
+          limit,
+          rawCount: response.data.length,
+        };
     },
 
     fetchPostById: async (id: number) => {

@@ -390,6 +390,9 @@ const MasonryGrid: React.FC<MasonryGridProps> = ({
 };
 
 const ImageGrid = () => {
+  const FETCH_LIMIT = 100;
+  const MAX_EMPTY_PAGE_HOPS = 5;
+
   const navigate = useNavigate();
   const [posts, setPosts] = React.useState<DanbooruPost[]>([]);
   const [loading, setLoading] = React.useState<boolean>(false);
@@ -403,8 +406,11 @@ const ImageGrid = () => {
 
   const [searchParams] = useSearchParams();
   const tags = searchParams.get("tags") || "";
+  const activeTags = useMemo(
+    () => tags.split(",").map((tag) => tag.trim()).filter(Boolean),
+    [tags]
+  );
 
-  // Load image loading preference
   React.useEffect(() => {
     const savedImageLoading = localStorage.getItem("image_loading") as
       | "lazy"
@@ -415,68 +421,105 @@ const ImageGrid = () => {
     }
   }, []);
 
-  React.useEffect(() => {
-    setLoading(true);
-    loadingRef.current = true;
-    setPage(1);
-    setHasMore(true);
-    setPosts([]);
-    scrollableRef.current?.scrollTo({ top: 0, behavior: "auto" });
+  const toUniquePosts = useCallback((inputPosts: DanbooruPost[]) => {
+    const postsWithFiles = inputPosts.filter((post) => post.file_url);
+    return Array.from(
+      new Map(postsWithFiles.map((post) => [post.id, post])).values()
+    );
+  }, []);
 
-    danbooruService
-      .fetchPosts(tags?.split(",") || [], 1, 100)
-      .then((fetchedPosts) => {
-        const postsWithFiles = fetchedPosts.filter((post) => post.file_url);
-        const uniquePosts = Array.from(
-          new Map(postsWithFiles.map((post) => [post.id, post])).values()
+  const fetchVisibleBatch = useCallback(
+    async (startPage: number) => {
+      let currentPage = startPage;
+      let lastFetchedPage = Math.max(startPage - 1, 0);
+      let hasMoreFromApi = true;
+
+      for (let attempts = 0; attempts < MAX_EMPTY_PAGE_HOPS; attempts += 1) {
+        const result = await danbooruService.fetchPosts(
+          activeTags,
+          currentPage,
+          FETCH_LIMIT
         );
-        setPosts(uniquePosts);
-        setHasMore(fetchedPosts.length === 100);
-      })
-      .catch((error) => {
+
+        lastFetchedPage = currentPage;
+        hasMoreFromApi = result.hasMore;
+
+        const processedPosts = toUniquePosts(result.posts);
+        if (processedPosts.length > 0 || !hasMoreFromApi) {
+          return {
+            posts: processedPosts,
+            page: lastFetchedPage,
+            hasMore: hasMoreFromApi,
+          };
+        }
+
+        currentPage += 1;
+      }
+
+      return {
+        posts: [],
+        page: lastFetchedPage,
+        hasMore: hasMoreFromApi,
+      };
+    },
+    [FETCH_LIMIT, MAX_EMPTY_PAGE_HOPS, activeTags, toUniquePosts]
+  );
+
+  React.useEffect(() => {
+    const fetchInitialPosts = async () => {
+      setLoading(true);
+      loadingRef.current = true;
+      setPage(1);
+      setHasMore(true);
+      setPosts([]);
+      scrollableRef.current?.scrollTo({ top: 0, behavior: "auto" });
+
+      try {
+        const initialResult = await fetchVisibleBatch(1);
+        setPosts(initialResult.posts);
+        setPage(initialResult.page);
+        setHasMore(initialResult.hasMore);
+      } catch (error) {
         console.error("Error fetching posts:", error);
         setHasMore(false);
-      })
-      .finally(() => {
+      } finally {
         setLoading(false);
         loadingRef.current = false;
-      });
-  }, [tags]);
+      }
+    };
 
-  const loadMorePosts = useCallback(() => {
+    fetchInitialPosts();
+  }, [fetchVisibleBatch]);
+
+  const loadMorePosts = useCallback(async () => {
     if (loadingRef.current || !hasMore) return;
 
     loadingRef.current = true;
     setLoading(true);
-    const nextPage = page + 1;
 
-    danbooruService
-      .fetchPosts(tags?.split(",") || [], nextPage, 100)
-      .then((fetchedPosts) => {
-        if (fetchedPosts.length > 0) {
-          const postsWithFiles = fetchedPosts.filter((post) => post.file_url);
-          setPosts((prev) => {
-            const combined = [...prev, ...postsWithFiles];
-            const uniquePosts = Array.from(
-              new Map(combined.map((post) => [post.id, post])).values()
-            );
-            return uniquePosts;
-          });
-          setPage(nextPage);
-          setHasMore(fetchedPosts.length === 100);
-        } else {
-          setHasMore(false);
-        }
-      })
-      .catch((error) => {
-        console.error("Error fetching more posts:", error);
-        setHasMore(false);
-      })
-      .finally(() => {
-        setLoading(false);
-        loadingRef.current = false;
-      });
-  }, [hasMore, page, tags]);
+    try {
+      const nextPage = page + 1;
+      const batchResult = await fetchVisibleBatch(nextPage);
+
+      if (batchResult.posts.length > 0) {
+        setPosts((prev) => {
+          const combined = [...prev, ...batchResult.posts];
+          return Array.from(
+            new Map(combined.map((post) => [post.id, post])).values()
+          );
+        });
+      }
+
+      setPage(batchResult.page);
+      setHasMore(batchResult.hasMore);
+    } catch (error) {
+      console.error("Error fetching more posts:", error);
+      setHasMore(false);
+    } finally {
+      setLoading(false);
+      loadingRef.current = false;
+    }
+  }, [fetchVisibleBatch, hasMore, page]);
 
   const handleScroll = useCallback(() => {
     const scrollableDiv = scrollableRef.current;
@@ -487,6 +530,22 @@ const ImageGrid = () => {
       loadMorePosts();
     }
   }, [loadMorePosts, hasMore]);
+
+  React.useEffect(() => {
+    const maybePrefetchIfViewportNotFilled = () => {
+      const scrollableDiv = scrollableRef.current;
+      if (!scrollableDiv || loadingRef.current || !hasMore) {
+        return;
+      }
+
+      if (scrollableDiv.scrollHeight <= scrollableDiv.clientHeight + 200) {
+        loadMorePosts();
+      }
+    };
+
+    const rafId = requestAnimationFrame(maybePrefetchIfViewportNotFilled);
+    return () => cancelAnimationFrame(rafId);
+  }, [posts, hasMore, loadMorePosts]);
 
   React.useEffect(() => {
     const scrollableDiv = scrollableRef.current;
@@ -513,8 +572,10 @@ const ImageGrid = () => {
 
   const handleItemClick = useCallback(
     (post: DanbooruPost) => {
-      const tags = searchParams.get("tags")?.split(",") || [];
-      navigate(`/search/${post.id}?tags=${encodeURIComponent(tags.join(","))}`);
+      const currentTags = searchParams.get("tags")?.split(",") || [];
+      navigate(
+        `/search/${post.id}?tags=${encodeURIComponent(currentTags.join(","))}`
+      );
     },
     [navigate, searchParams]
   );

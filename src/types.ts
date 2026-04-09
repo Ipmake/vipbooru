@@ -42,6 +42,14 @@ export interface BlacklistTagSetting {
 
 export const BLACKLIST_STORAGE_KEY = 'danbooru_blacklist_tags';
 
+export interface FetchPostsResult {
+  posts: DanbooruPost[];
+  hasMore: boolean;
+  page: number;
+  limit: number;
+  rawCount: number;
+}
+
 export interface DownloadItem {
   id: string;
   url: string;

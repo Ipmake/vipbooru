@@ -20,11 +20,16 @@ import { generateFilenameFromTags } from "../utils/filenameUtils";
 import { danbooruUtil } from "../utils/danbooru";
 
 const ImagePreviewDrawer: React.FC = () => {
+  const SWIPE_DISTANCE_THRESHOLD = 24;
+
   const navigate = useNavigate();
   const location = useLocation();
   const [post, setPost] = React.useState<DanbooruPost | null>(null);
   const [loading, setLoading] = React.useState<boolean>(false);
   const [isDetailsExpanded, setIsDetailsExpanded] = React.useState<boolean>(false);
+  const swipeStartYRef = React.useRef<number | null>(null);
+  const swipeStartXRef = React.useRef<number | null>(null);
+  const swipeTriggeredRef = React.useRef(false);
 
   const { postId } = useParams<{ postId?: string }>();
 
@@ -67,6 +72,121 @@ const ImagePreviewDrawer: React.FC = () => {
       navigate("/search" + tags);
     }
   };
+
+  const getTagList = React.useCallback((tagString: string): string[] => {
+    return tagString
+      .split(/\s+/)
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+  }, []);
+
+  const handleTagClick = React.useCallback(
+    (tag: string) => {
+      navigate(`/search?tags=${encodeURIComponent(tag)}`);
+    },
+    [navigate]
+  );
+
+  const commonTagChipSx = React.useMemo(
+    () => ({
+      borderRadius: "4px",
+      fontWeight: 400,
+      backgroundColor: "rgba(40, 40, 40, 0.7)",
+      color: "#e0e0e0",
+      border: "1px solid rgba(255, 255, 255, 0.05)",
+      margin: "2px",
+      height: "22px",
+      "&:hover": {
+        backgroundColor: "rgba(70, 70, 70, 0.7)",
+        color: "white",
+      },
+    }),
+    []
+  );
+
+  const renderTagChipGroup = React.useCallback(
+    (tagString: string, prefix: string) => {
+      const tags = getTagList(tagString);
+
+      if (tags.length === 0) {
+        return null;
+      }
+
+      return (
+        <Box
+          sx={{
+            display: "flex",
+            flexWrap: "wrap",
+            justifyContent: "flex-end",
+            gap: 0.5,
+            maxWidth: "70%",
+          }}
+        >
+          {tags.map((tag) => (
+            <Chip
+              key={`${prefix}-${tag}`}
+              label={tag}
+              size="small"
+              onClick={() => handleTagClick(tag)}
+              sx={commonTagChipSx}
+            />
+          ))}
+        </Box>
+      );
+    },
+    [commonTagChipSx, getTagList, handleTagClick]
+  );
+
+  const handleTouchStart = React.useCallback(
+    (event: React.TouchEvent) => {
+      if (!isMobile) {
+        return;
+      }
+
+      swipeTriggeredRef.current = false;
+      swipeStartYRef.current = event.touches[0].clientY;
+      swipeStartXRef.current = event.touches[0].clientX;
+    },
+    [isMobile]
+  );
+
+  const handleTouchEnd = React.useCallback(
+    (event: React.TouchEvent) => {
+      if (!isMobile || swipeStartYRef.current === null || swipeStartXRef.current === null) {
+        return;
+      }
+
+      const endY = event.changedTouches[0].clientY;
+      const endX = event.changedTouches[0].clientX;
+      const deltaY = endY - swipeStartYRef.current;
+      const deltaX = endX - swipeStartXRef.current;
+
+      swipeStartYRef.current = null;
+      swipeStartXRef.current = null;
+
+      if (Math.abs(deltaY) < SWIPE_DISTANCE_THRESHOLD || Math.abs(deltaY) <= Math.abs(deltaX)) {
+        return;
+      }
+
+      swipeTriggeredRef.current = true;
+      if (deltaY < 0) {
+        setIsDetailsExpanded(true);
+        return;
+      }
+
+      setIsDetailsExpanded(false);
+    },
+    [SWIPE_DISTANCE_THRESHOLD, isMobile]
+  );
+
+  const handleDetailsToggleClick = React.useCallback(() => {
+    if (swipeTriggeredRef.current) {
+      swipeTriggeredRef.current = false;
+      return;
+    }
+
+    setIsDetailsExpanded((previousValue) => !previousValue);
+  }, []);
 
   return (
     <Drawer
@@ -123,6 +243,8 @@ const ImagePreviewDrawer: React.FC = () => {
                   justifyContent: "center",
                   borderLeft: "none",
                 }}
+                onTouchStart={handleTouchStart}
+                onTouchEnd={handleTouchEnd}
               >
                 {/* Close button */}
                 <IconButton
@@ -287,7 +409,9 @@ const ImagePreviewDrawer: React.FC = () => {
                 }}
               >
                 <Box
-                  onClick={() => setIsDetailsExpanded(!isDetailsExpanded)}
+                  onClick={handleDetailsToggleClick}
+                  onTouchStart={handleTouchStart}
+                  onTouchEnd={handleTouchEnd}
                   sx={{
                     display: { xs: "flex", md: "none" },
                     alignItems: "center",
@@ -496,6 +620,7 @@ const ImagePreviewDrawer: React.FC = () => {
                       sx={{
                         display: "flex",
                         justifyContent: "space-between",
+                        alignItems: "flex-start",
                         mt: 1.2,
                       }}
                     >
@@ -505,15 +630,7 @@ const ImagePreviewDrawer: React.FC = () => {
                       >
                         Artist:
                       </Typography>
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          color: "#e0e0e0",
-                          fontWeight: 500,
-                        }}
-                      >
-                        {post.tag_string_artist.split(" ").join(", ")}
-                      </Typography>
+                      {renderTagChipGroup(post.tag_string_artist, "artist")}
                     </Box>
                   )}
 
@@ -523,6 +640,7 @@ const ImagePreviewDrawer: React.FC = () => {
                       sx={{
                         display: "flex",
                         justifyContent: "space-between",
+                        alignItems: "flex-start",
                         mt: 1.2,
                       }}
                     >
@@ -532,17 +650,7 @@ const ImagePreviewDrawer: React.FC = () => {
                       >
                         From:
                       </Typography>
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          color: "#e0e0e0",
-                          fontWeight: 500,
-                          maxWidth: "70%",
-                          textAlign: "right",
-                        }}
-                      >
-                        {post.tag_string_copyright.split(" ").join(", ")}
-                      </Typography>
+                      {renderTagChipGroup(post.tag_string_copyright, "copyright")}
                     </Box>
                   )}
 
@@ -552,6 +660,7 @@ const ImagePreviewDrawer: React.FC = () => {
                       sx={{
                         display: "flex",
                         justifyContent: "space-between",
+                        alignItems: "flex-start",
                         mt: 1.2,
                       }}
                     >
@@ -561,17 +670,27 @@ const ImagePreviewDrawer: React.FC = () => {
                       >
                         Characters:
                       </Typography>
+                      {renderTagChipGroup(post.tag_string_character, "character")}
+                    </Box>
+                  )}
+
+                  {/* Add Meta information */}
+                  {post.tag_string_meta && (
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-start",
+                        mt: 1.2,
+                      }}
+                    >
                       <Typography
                         variant="body2"
-                        sx={{
-                          color: "#e0e0e0",
-                          fontWeight: 500,
-                          maxWidth: "70%",
-                          textAlign: "right",
-                        }}
+                        sx={{ color: "rgba(224, 224, 224, 0.75)" }}
                       >
-                        {post.tag_string_character.split(" ").join(", ")}
+                        Meta:
                       </Typography>
+                      {renderTagChipGroup(post.tag_string_meta, "meta")}
                     </Box>
                   )}
 
@@ -651,27 +770,15 @@ const ImagePreviewDrawer: React.FC = () => {
                       },
                     }}
                   >
-                    {post.tag_string.split(" ").map((tag) => (
+                    {getTagList(post.tag_string).map((tag) => (
                       <Chip
                         key={tag}
                         label={tag}
                         size="small"
                         onClick={() => {
-                          navigate(`/search?tags=${encodeURIComponent(tag)}`);
+                          handleTagClick(tag);
                         }}
-                        sx={{
-                          borderRadius: "4px",
-                          fontWeight: 400,
-                          backgroundColor: "rgba(40, 40, 40, 0.7)",
-                          color: "#e0e0e0",
-                          border: "1px solid rgba(255, 255, 255, 0.05)",
-                          margin: "2px",
-                          height: "22px",
-                          "&:hover": {
-                            backgroundColor: "rgba(70, 70, 70, 0.7)",
-                            color: "white",
-                          },
-                        }}
+                        sx={commonTagChipSx}
                       />
                     ))}
                   </Box>
