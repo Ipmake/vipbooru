@@ -1,5 +1,60 @@
 import axios from 'axios';
-import type { AutocompleteResult, DanbooruPost } from '../types';
+import {
+  BLACKLIST_STORAGE_KEY,
+  type AutocompleteResult,
+  type BlacklistTagSetting,
+  type DanbooruPost,
+} from '../types';
+
+const normalizeTag = (tag: string): string => tag.trim().toLowerCase();
+
+const getActiveBlacklistTags = (): Set<string> => {
+  if (typeof window === 'undefined') {
+    return new Set();
+  }
+
+  const rawValue = localStorage.getItem(BLACKLIST_STORAGE_KEY);
+  if (!rawValue) {
+    return new Set();
+  }
+
+  try {
+    const parsedValue = JSON.parse(rawValue) as BlacklistTagSetting[];
+
+    return new Set(
+      parsedValue
+        .filter((entry) => entry.enabled)
+        .map((entry) => normalizeTag(entry.tag))
+        .filter(Boolean)
+    );
+  } catch {
+    return new Set();
+  }
+};
+
+const hasBlacklistedTag = (
+  post: DanbooruPost,
+  activeBlacklistTags: Set<string>
+): boolean => {
+  if (activeBlacklistTags.size === 0 || !post.tag_string) {
+    return false;
+  }
+
+  const postTags = new Set(
+    post.tag_string
+      .split(/\s+/)
+      .map((tag) => normalizeTag(tag))
+      .filter(Boolean)
+  );
+
+  for (const blacklistedTag of activeBlacklistTags) {
+    if (postTags.has(blacklistedTag)) {
+      return true;
+    }
+  }
+
+  return false;
+};
 
 // Function to get auth headers if credentials are available
 const getAuth = () => {
@@ -43,7 +98,15 @@ export const danbooruService = {
                 limit,
             }
         });
-        return response.data;
+
+        const activeBlacklistTags = getActiveBlacklistTags();
+        if (activeBlacklistTags.size === 0) {
+          return response.data;
+        }
+
+        return response.data.filter(
+          (post) => !hasBlacklistedTag(post, activeBlacklistTags)
+        );
     },
 
     fetchPostById: async (id: number) => {

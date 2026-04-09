@@ -1,5 +1,8 @@
 import React from "react";
 import {
+  Autocomplete,
+  Chip,
+  CircularProgress,
   Box,
   Typography,
   TextField,
@@ -15,9 +18,79 @@ import {
   FormHelperText,
   Avatar,
   Link,
+  Stack,
+  Switch,
+  IconButton as MuiIconButton,
 } from "@mui/material";
-import { ArrowBack } from "@mui/icons-material";
+import { ArrowBack, DeleteOutline } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
+import { danbooruService } from "../services/danbooru";
+import { danbooruUtil } from "../utils/danbooru";
+import {
+  BLACKLIST_STORAGE_KEY,
+  type AutocompleteResult,
+  type BlacklistTagSetting,
+} from "../types";
+
+const normalizeTag = (tag: string): string => tag.trim().toLowerCase();
+
+const sanitizeBlacklistEntries = (
+  entries: BlacklistTagSetting[]
+): BlacklistTagSetting[] => {
+  const dedupedEntries = new Map<string, BlacklistTagSetting>();
+
+  for (const entry of entries) {
+    const normalizedTag = normalizeTag(entry.tag);
+    if (!normalizedTag || dedupedEntries.has(normalizedTag)) {
+      continue;
+    }
+
+    dedupedEntries.set(normalizedTag, {
+      tag: normalizedTag,
+      enabled: Boolean(entry.enabled),
+    });
+  }
+
+  return [...dedupedEntries.values()];
+};
+
+const parseBlacklistEntries = (value: string | null): BlacklistTagSetting[] => {
+  if (!value) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    if (parsed.every((item) => typeof item === "string")) {
+      return sanitizeBlacklistEntries(
+        (parsed as string[]).map((tag) => ({ tag, enabled: true }))
+      );
+    }
+
+    const typedEntries = parsed
+      .filter((item): item is BlacklistTagSetting => {
+        if (typeof item !== "object" || item === null) {
+          return false;
+        }
+
+        const maybeItem = item as Partial<BlacklistTagSetting>;
+        return typeof maybeItem.tag === "string";
+      })
+      .map((item) => ({
+        tag: item.tag,
+        enabled: item.enabled ?? true,
+      }));
+
+    return sanitizeBlacklistEntries(typedEntries);
+  } catch {
+    return [];
+  }
+};
 
 function InfoPage() {
   const navigate = useNavigate();
@@ -26,6 +99,16 @@ function InfoPage() {
   const [imageLoading, setImageLoading] = React.useState<"lazy" | "eager">(
     "lazy"
   );
+  const [blacklistEntries, setBlacklistEntries] = React.useState<
+    BlacklistTagSetting[]
+  >([]);
+  const [blacklistSuggestions, setBlacklistSuggestions] = React.useState<
+    AutocompleteResult[]
+  >([]);
+  const [blacklistInputValue, setBlacklistInputValue] = React.useState("");
+  const [blacklistInputLoading, setBlacklistInputLoading] = React.useState(false);
+  const [blacklistAutocompleteOpen, setBlacklistAutocompleteOpen] =
+    React.useState(false);
   const [saved, setSaved] = React.useState(false);
 
   // Load saved settings on mount
@@ -36,10 +119,92 @@ function InfoPage() {
       | "lazy"
       | "eager"
       | null;
+    const savedBlacklistEntries = parseBlacklistEntries(
+      localStorage.getItem(BLACKLIST_STORAGE_KEY)
+    );
+
     if (savedApiKey) setApiKey(savedApiKey);
     if (savedUsername) setUsername(savedUsername);
     if (savedImageLoading) setImageLoading(savedImageLoading);
+    setBlacklistEntries(savedBlacklistEntries);
   }, []);
+
+  React.useEffect(() => {
+    const debounceTimer = setTimeout(() => {
+      const query = blacklistInputValue.trim();
+
+      if (!query) {
+        setBlacklistSuggestions([]);
+        setBlacklistInputLoading(false);
+        return;
+      }
+
+      setBlacklistInputLoading(true);
+
+      danbooruService
+        .searchAutocomplete(query)
+        .then((results) => {
+          setBlacklistSuggestions(results);
+        })
+        .finally(() => {
+          setBlacklistInputLoading(false);
+        });
+    }, 300);
+
+    return () => clearTimeout(debounceTimer);
+  }, [blacklistInputValue]);
+
+  const mergeBlacklistTags = React.useCallback(
+    (rawTags: string[]) => {
+      setBlacklistEntries((previousEntries) => {
+        const previousEntriesByTag = new Map(
+          previousEntries.map((entry) => [normalizeTag(entry.tag), entry])
+        );
+
+        const mergedEntries: BlacklistTagSetting[] = [];
+        const seenTags = new Set<string>();
+
+        for (const rawTag of rawTags) {
+          const normalizedTag = normalizeTag(rawTag);
+
+          if (!normalizedTag || seenTags.has(normalizedTag)) {
+            continue;
+          }
+
+          seenTags.add(normalizedTag);
+          const previousEntry = previousEntriesByTag.get(normalizedTag);
+
+          mergedEntries.push({
+            tag: normalizedTag,
+            enabled: previousEntry?.enabled ?? true,
+          });
+        }
+
+        return mergedEntries;
+      });
+    },
+    [setBlacklistEntries]
+  );
+
+  const toggleBlacklistTag = (tag: string) => {
+    const normalizedTag = normalizeTag(tag);
+
+    setBlacklistEntries((previousEntries) =>
+      previousEntries.map((entry) =>
+        normalizeTag(entry.tag) === normalizedTag
+          ? { ...entry, enabled: !entry.enabled }
+          : entry
+      )
+    );
+  };
+
+  const removeBlacklistTag = (tag: string) => {
+    const normalizedTag = normalizeTag(tag);
+
+    setBlacklistEntries((previousEntries) =>
+      previousEntries.filter((entry) => normalizeTag(entry.tag) !== normalizedTag)
+    );
+  };
 
   const handleSave = () => {
     if (apiKey.trim()) {
@@ -55,6 +220,10 @@ function InfoPage() {
     }
 
     localStorage.setItem("image_loading", imageLoading);
+    localStorage.setItem(
+      BLACKLIST_STORAGE_KEY,
+      JSON.stringify(sanitizeBlacklistEntries(blacklistEntries))
+    );
 
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
@@ -64,9 +233,11 @@ function InfoPage() {
     setApiKey("");
     setUsername("");
     setImageLoading("lazy");
+    setBlacklistEntries([]);
     localStorage.removeItem("danbooru_api_key");
     localStorage.removeItem("danbooru_username");
     localStorage.removeItem("image_loading");
+    localStorage.removeItem(BLACKLIST_STORAGE_KEY);
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
   };
@@ -279,6 +450,228 @@ function InfoPage() {
               you to be rate-limited.
             </FormHelperText>
           </FormControl>
+
+          <Divider sx={{ my: 3 }} />
+
+          <Typography
+            variant="h6"
+            gutterBottom
+            fontWeight="bold"
+            sx={{ fontSize: { xs: "1.1rem", sm: "1.25rem" } }}
+          >
+            Blacklist Settings
+          </Typography>
+
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ mb: 1.5, fontSize: { xs: "0.8rem", sm: "0.875rem" } }}
+          >
+            Add tags to blacklist and toggle each one on or off. Enabled tags
+            are filtered out of all fetched posts.
+          </Typography>
+
+          <Autocomplete
+            multiple
+            freeSolo
+            options={blacklistSuggestions}
+            open={blacklistAutocompleteOpen}
+            onOpen={() => setBlacklistAutocompleteOpen(true)}
+            onClose={() => setBlacklistAutocompleteOpen(false)}
+            getOptionLabel={(option) =>
+              typeof option === "string" ? option : option.label
+            }
+            value={blacklistEntries.map((entry) => entry.tag)}
+            inputValue={blacklistInputValue}
+            onInputChange={(_, value) => setBlacklistInputValue(value)}
+            onChange={(_, newValue) => {
+              const nextTags = newValue.map((item) =>
+                typeof item === "string" ? item : item.value
+              );
+              mergeBlacklistTags(nextTags);
+            }}
+            filterOptions={(x) => x}
+            renderValue={(value, getTagProps) =>
+              value.map((option, index) => {
+                const isString = typeof option === "string";
+                const tagText = isString ? option : option.label;
+                const { key, ...chipProps } = getTagProps({ index });
+                const entry = blacklistEntries.find(
+                  (item) => normalizeTag(item.tag) === normalizeTag(tagText)
+                );
+
+                return (
+                  <Chip
+                    key={key}
+                    size="small"
+                    variant={entry?.enabled === false ? "outlined" : "filled"}
+                    label={tagText}
+                    color={danbooruUtil.getTagColor(tagText)}
+                    sx={{
+                      borderRadius: "4px",
+                      fontWeight: 400,
+                      height: "24px",
+                      fontSize: "0.75rem",
+                      opacity: entry?.enabled === false ? 0.65 : 1,
+                      "& .MuiChip-label": {
+                        padding: "0 8px",
+                      },
+                      "& .MuiChip-deleteIcon": {
+                        fontSize: "16px",
+                        color: "rgba(255, 255, 255, 0.7)",
+                        "&:hover": {
+                          color: "white",
+                        },
+                      },
+                    }}
+                    {...chipProps}
+                  />
+                );
+              })
+            }
+            renderOption={(props, option) => {
+              const isString = typeof option === "string";
+              const label = isString ? option : option.label;
+              const category = !isString ? option.category : undefined;
+              const postCount = !isString ? option.post_count : undefined;
+
+              return (
+                <Box
+                  component="li"
+                  {...props}
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "6px 10px",
+                    borderLeft: "3px solid",
+                    borderLeftColor: !isString
+                      ? danbooruUtil.getCategoryColor(category as number)
+                      : "transparent",
+                    "&:hover": {
+                      backgroundColor: "rgba(108, 99, 255, 0.1)",
+                    },
+                  }}
+                >
+                  <Box sx={{ display: "flex", alignItems: "center" }}>
+                    {!isString && category !== undefined && (
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          mr: 1,
+                          py: 0.2,
+                          px: 0.8,
+                          borderRadius: "4px",
+                          backgroundColor:
+                            danbooruUtil.getCategoryColor(category),
+                          color: "#fff",
+                          fontWeight: 600,
+                          fontSize: "0.65rem",
+                          letterSpacing: 0.3,
+                        }}
+                      >
+                        {danbooruUtil.getCategoryName(category)}
+                      </Typography>
+                    )}
+                    <Typography>{label}</Typography>
+                  </Box>
+                  {!isString && postCount !== undefined && (
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: "rgba(255, 255, 255, 0.5)",
+                        ml: 2,
+                      }}
+                    >
+                      {postCount.toLocaleString()} posts
+                    </Typography>
+                  )}
+                </Box>
+              );
+            }}
+            loading={blacklistInputLoading}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                variant="outlined"
+                placeholder="Add blacklisted tags..."
+                slotProps={{
+                  input: {
+                    ...params.InputProps,
+                    endAdornment: (
+                      <>
+                        {blacklistInputLoading ? (
+                          <CircularProgress color="inherit" size={20} />
+                        ) : null}
+                        {params.InputProps.endAdornment}
+                      </>
+                    ),
+                    sx: {
+                      p: "2px 4px",
+                      borderRadius: "8px",
+                    },
+                  },
+                }}
+              />
+            )}
+            sx={{ mb: 2 }}
+          />
+
+          {blacklistEntries.length > 0 ? (
+            <Stack spacing={1} sx={{ mb: 3 }}>
+              {blacklistEntries.map((entry) => (
+                <Box
+                  key={entry.tag}
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 1,
+                    p: 1,
+                    borderRadius: 1,
+                    backgroundColor: "rgba(255, 255, 255, 0.03)",
+                  }}
+                >
+                  <Chip
+                    label={entry.tag}
+                    size="small"
+                    color={danbooruUtil.getTagColor(entry.tag)}
+                    variant={entry.enabled ? "filled" : "outlined"}
+                    sx={{ opacity: entry.enabled ? 1 : 0.65 }}
+                  />
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ minWidth: 46, textAlign: "right" }}
+                    >
+                      {entry.enabled ? "ON" : "OFF"}
+                    </Typography>
+                    <Switch
+                      checked={entry.enabled}
+                      size="small"
+                      onChange={() => toggleBlacklistTag(entry.tag)}
+                    />
+                    <MuiIconButton
+                      size="small"
+                      color="error"
+                      onClick={() => removeBlacklistTag(entry.tag)}
+                    >
+                      <DeleteOutline fontSize="small" />
+                    </MuiIconButton>
+                  </Box>
+                </Box>
+              ))}
+            </Stack>
+          ) : (
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{ mb: 3, fontSize: { xs: "0.8rem", sm: "0.875rem" } }}
+            >
+              No blacklisted tags yet.
+            </Typography>
+          )}
 
           <Box
             sx={{

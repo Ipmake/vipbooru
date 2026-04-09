@@ -35,6 +35,13 @@ export interface AutocompleteResult {
   antecedent?: string;
 }
 
+export interface BlacklistTagSetting {
+  tag: string;
+  enabled: boolean;
+}
+
+export const BLACKLIST_STORAGE_KEY = 'danbooru_blacklist_tags';
+
 export interface DownloadItem {
   id: string;
   url: string;
