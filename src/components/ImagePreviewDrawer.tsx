@@ -344,7 +344,7 @@ const ImagePreviewDrawer: React.FC = () => {
                 {/* Image */}
                 {post.file_ext === "webm" || post.file_ext === "mp4" ? (
                   <video
-                    src={post.large_file_url || post.file_url}
+                    src={post.file_url}
                     style={{
                       maxWidth: "100%",
                       maxHeight: "100%",
@@ -356,7 +356,7 @@ const ImagePreviewDrawer: React.FC = () => {
                   />
                 ) : (
                   <img
-                    src={post.large_file_url || post.file_url}
+                    src={post.file_url}
                     alt={`Image ${post.id}`}
                     style={{
                       maxWidth: "100%",
