@@ -1,31 +1,70 @@
-import React, { useRef, useCallback, useMemo, useEffect } from "react";
-import { Box, Chip, CircularProgress, Typography } from "@mui/material";
-import type { DanbooruPost } from "../types";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { danbooruService } from "../services/danbooru";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties, RefObject } from "react";
+import { Box, Chip, CircularProgress, useMediaQuery } from "@mui/material";
 import { styled } from "@mui/material/styles";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import type { DanbooruPost } from "../types";
+import { danbooruService } from "../services/danbooru";
+
+type ImageLoading = "lazy" | "eager";
+
+interface ItemLayout {
+  top: number;
+  left: number;
+  height: number;
+}
+
+interface MasonryLayout {
+  items: ItemLayout[];
+  height: number;
+  maxItemHeight: number;
+}
+
+interface MasonryCardProps {
+  post: DanbooruPost;
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+  imageLoading: ImageLoading;
+  onClick: (post: DanbooruPost) => void;
+}
+
+interface MasonryGridProps {
+  posts: DanbooruPost[];
+  onItemClick: (post: DanbooruPost) => void;
+  imageLoading: ImageLoading;
+}
+
+const FETCH_LIMIT = 100;
+const MAX_EMPTY_PAGE_HOPS = 5;
+const LOAD_MORE_MARGIN = 850;
+const COLUMN_GUTTER = 8;
+const OVERSCAN = 1000;
+const SCROLL_STEP = 250;
+const VIDEO_EXTENSIONS = new Set(["webm", "mp4"]);
+const EMPTY_LAYOUT: MasonryLayout = { items: [], height: 0, maxItemHeight: 0 };
 
 const MasonryItem = styled(Box)(({ theme }) => ({
   position: "absolute",
   overflow: "hidden",
-  borderRadius: "12px",
+  borderRadius: "4px",
   cursor: "pointer",
   boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)",
   backgroundColor: "rgba(30, 30, 30, 0.95)",
-  transition: "all 0.3s ease",
+  transition: "transform 0.2s ease-out, box-shadow 0.2s ease-out",
   willChange: "transform",
   WebkitTapHighlightColor: "transparent",
   touchAction: "manipulation",
 
   "&:hover": {
     boxShadow: "0 8px 20px rgba(0, 0, 0, 0.2)",
-    transform: "translateY(-4px) scale(1.03)",
-    zIndex: 10,
-    borderRadius: "16px",
+    transform: "scale(0.98)",
+    zIndex: 5,
   },
 
   "&:active": {
-    transform: "scale(0.98)",
+    transform: "scale(0.96)",
   },
 
   [theme.breakpoints.down("sm")]: {
@@ -37,352 +76,233 @@ const MasonryItem = styled(Box)(({ theme }) => ({
   },
 }));
 
-interface MasonryGridProps {
-  posts: DanbooruPost[];
-  onItemClick: (post: DanbooruPost) => void;
-  scrollableRef: React.RefObject<HTMLDivElement | null>;
-  imageLoading?: "lazy" | "eager";
-}
+const videoChipSx = {
+  position: "absolute",
+  top: 8,
+  left: 8,
+  zIndex: 10,
+  backgroundColor: "rgba(0, 0, 0, 0.6)",
+  color: "#fff",
+  fontWeight: "bold",
+  pointerEvents: "none",
+} as const;
 
-interface ItemPosition {
-  top: number;
-  left: number;
-  height: number;
-  column: number;
-}
+const imageStyle: CSSProperties = {
+  width: "100%",
+  height: "100%",
+  display: "block",
+  objectFit: "cover",
+  userSelect: "none",
+  MozWindowDragging: "no-drag",
+};
 
-const MasonryGrid: React.FC<MasonryGridProps> = ({
-  posts,
-  onItemClick,
-  scrollableRef,
-  imageLoading = "lazy",
-}) => {
-  const [containerWidth, setContainerWidth] = React.useState(0);
-  const [scrollTop, setScrollTop] = React.useState(0);
-  const [containerHeight, setContainerHeight] = React.useState(0);
+const uniqueById = (posts: DanbooruPost[]) =>
+  Array.from(new Map(posts.map((post) => [post.id, post] as const)).values());
 
-  const visibleImageRefs = React.useRef<Map<string, HTMLDivElement>>(new Map());
-  const itemHeightsRef = React.useRef<Map<number, number>>(new Map());
-  const loadedImagesRef = React.useRef<Set<number>>(new Set());
-  const positionsCache = React.useRef<ItemPosition[]>([]);
-  const [layoutVersion, setLayoutVersion] = React.useState(0);
-  const pendingRecalcRef = React.useRef(false);
+const computeLayout = (
+  posts: DanbooruPost[],
+  columnCount: number,
+  columnWidth: number,
+): MasonryLayout => {
+  const columnHeights = new Array<number>(columnCount).fill(0);
+  const items = new Array<ItemLayout>(posts.length);
+  let maxItemHeight = 0;
 
-  // Responsive column width based on screen size
-  const getColumnWidth = () => {
-    if (typeof window === "undefined") return 300;
-    const width = window.innerWidth;
-    if (width < 600) return 140;
-    if (width < 960) return 220;
-    return 300;
-  };
+  for (let index = 0; index < posts.length; index += 1) {
+    const { image_width, image_height } = posts[index];
+    const aspectRatio =
+      image_width && image_height ? image_height / image_width : 1;
+    const height = Math.round(columnWidth * aspectRatio);
 
-  const columnWidth = getColumnWidth();
-  const columnGutter = 12;
-  const columnCount = Math.max(
-    1,
-    Math.floor((containerWidth + columnGutter) / (columnWidth + columnGutter))
-  );
-  const totalGutterWidth = (columnCount - 1) * columnGutter;
-  const actualColumnWidth = Math.floor(
-    (containerWidth - totalGutterWidth) / columnCount
-  );
-
-  const listContainerRef = useRef<HTMLElement>(null);
-
-  // Reset everything when posts change
-  useEffect(() => {
-    if (posts.length === 0) {
-      itemHeightsRef.current.clear();
-      loadedImagesRef.current.clear();
-      positionsCache.current = [];
-      pendingRecalcRef.current = false;
-      setLayoutVersion((v) => v + 1);
+    let column = 0;
+    for (let i = 1; i < columnCount; i += 1) {
+      if (columnHeights[i] < columnHeights[column]) column = i;
     }
-  }, [posts.length]);
 
-  // Track container dimensions
-  React.useEffect(() => {
-    const element = listContainerRef.current;
+    items[index] = {
+      top: columnHeights[column],
+      left: column * (columnWidth + COLUMN_GUTTER),
+      height,
+    };
+    columnHeights[column] += height + COLUMN_GUTTER;
+    if (height > maxItemHeight) maxItemHeight = height;
+  }
+
+  return {
+    items,
+    height: Math.max(0, Math.max(...columnHeights) - COLUMN_GUTTER),
+    maxItemHeight,
+  };
+};
+
+const firstIndexWithTopAtLeast = (items: ItemLayout[], y: number) => {
+  let low = 0;
+  let high = items.length;
+  while (low < high) {
+    const mid = (low + high) >>> 1;
+    if (items[mid].top < y) low = mid + 1;
+    else high = mid;
+  }
+  return low;
+};
+
+const useTargetColumnWidth = () => {
+  const isMobile = useMediaQuery("(max-width:599.95px)");
+  const isTablet = useMediaQuery("(max-width:959.95px)");
+  if (isMobile) return 140;
+  return isTablet ? 220 : 300;
+};
+
+const useElementWidth = (ref: RefObject<HTMLElement | null>) => {
+  const [width, setWidth] = useState(0);
+
+  useEffect(() => {
+    const element = ref.current;
     if (!element) return;
 
-    const updateDimensions = () => {
-      const newWidth = element.clientWidth;
-      if (newWidth !== containerWidth && newWidth > 0) {
-        setContainerWidth(newWidth);
-        // Clear positions cache when width changes
-        positionsCache.current = [];
-        loadedImagesRef.current.clear();
-        itemHeightsRef.current.clear();
-        setLayoutVersion((v) => v + 1);
+    const observer = new ResizeObserver(([entry]) =>
+      setWidth(Math.floor(entry.contentRect.width)),
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [ref]);
+
+  return width;
+};
+
+const useWindowViewport = (ref: RefObject<HTMLElement | null>) => {
+  const [top, setTop] = useState(0);
+  const [height, setHeight] = useState(() => window.innerHeight);
+
+  useEffect(() => {
+    let frame = 0;
+
+    const update = () => {
+      frame = 0;
+      const element = ref.current;
+      if (element) {
+        const offset = -element.getBoundingClientRect().top;
+        setTop(Math.floor(offset / SCROLL_STEP) * SCROLL_STEP);
       }
+      setHeight(window.innerHeight);
     };
 
-    const resizeObserver = new ResizeObserver(updateDimensions);
-    resizeObserver.observe(element);
-    updateDimensions();
-
-    return () => resizeObserver.disconnect();
-  }, [containerWidth]);
-
-  // Throttled scroll tracking
-  React.useEffect(() => {
-    const element = scrollableRef.current;
-    if (!element) return;
-
-    let rafId: number | null = null;
-
-    const updateScrollAndHeight = () => {
-      setScrollTop(element.scrollTop);
-      setContainerHeight(element.clientHeight);
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(update);
     };
 
-    const handleScroll = () => {
-      if (rafId === null) {
-        rafId = requestAnimationFrame(() => {
-          setScrollTop(element.scrollTop);
-          rafId = null;
-        });
-      }
-    };
-
-    updateScrollAndHeight();
-    element.addEventListener("scroll", handleScroll, { passive: true });
-    const resizeObserver = new ResizeObserver(updateScrollAndHeight);
-    resizeObserver.observe(element);
+    update();
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
 
     return () => {
-      if (rafId !== null) {
-        cancelAnimationFrame(rafId);
-      }
-      element.removeEventListener("scroll", handleScroll);
-      resizeObserver.disconnect();
+      cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
     };
-  }, [scrollableRef]);
+  }, [ref]);
 
-  // Debounced layout recalculation
-  const scheduleRecalc = useCallback(() => {
-    if (pendingRecalcRef.current) return;
+  return { top, height };
+};
 
-    pendingRecalcRef.current = true;
-    requestAnimationFrame(() => {
-      pendingRecalcRef.current = false;
-      positionsCache.current = [];
-      setLayoutVersion((v) => v + 1);
-    });
-  }, []);
+const MasonryCard = memo(function MasonryCard({
+  post,
+  top,
+  left,
+  width,
+  height,
+  imageLoading,
+  onClick,
+}: MasonryCardProps) {
+  const isVideo = VIDEO_EXTENSIONS.has(post.file_ext);
 
-  // Optimized image load handler
-  const handleImageLoad = useCallback(
-    (index: number, uniqueKey: string, imgElement: HTMLImageElement) => {
-      // Skip if already processed
-      if (loadedImagesRef.current.has(index)) return;
+  return (
+    <MasonryItem
+      onClick={() => onClick(post)}
+      style={{ top, left, width, height }}
+    >
+      {isVideo && (
+        <Chip label="VIDEO" size="small" color="secondary" sx={videoChipSx} />
+      )}
+      <img
+        draggable={false}
+        src={
+          isVideo
+            ? post.preview_file_url
+            : post.large_file_url || post.preview_file_url
+        }
+        loading={imageLoading}
+        style={imageStyle}
+      />
+    </MasonryItem>
+  );
+});
 
-      const containerElement = visibleImageRefs.current.get(uniqueKey);
-      if (!containerElement || !imgElement.naturalHeight) return;
+const MasonryGrid = ({
+  posts,
+  onItemClick,
+  imageLoading,
+}: MasonryGridProps) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const containerWidth = useElementWidth(containerRef);
+  const viewport = useWindowViewport(containerRef);
+  const targetColumnWidth = useTargetColumnWidth();
 
-      // Use natural dimensions for accurate height
-      const aspectRatio = imgElement.naturalHeight / imgElement.naturalWidth;
-      const actualHeight = Math.floor(actualColumnWidth * aspectRatio);
-
-      // Only update if height is valid and different
-      const currentHeight = itemHeightsRef.current.get(index);
-      if (actualHeight > 0 && currentHeight !== actualHeight) {
-        itemHeightsRef.current.set(index, actualHeight);
-        loadedImagesRef.current.add(index);
-        scheduleRecalc();
-      }
-    },
-    [actualColumnWidth, scheduleRecalc]
+  const columnCount = Math.max(
+    1,
+    Math.floor(
+      (containerWidth + COLUMN_GUTTER) / (targetColumnWidth + COLUMN_GUTTER),
+    ),
+  );
+  const columnWidth = Math.floor(
+    (containerWidth - (columnCount - 1) * COLUMN_GUTTER) / columnCount,
   );
 
-  // Calculate positions with better estimation
-  const positions = useMemo(() => {
-    // Only use cache if we have positions for all current posts
-    if (
-      positionsCache.current.length === posts.length &&
-      positionsCache.current.length > 0
-    ) {
-      return positionsCache.current;
-    }
+  const layout = useMemo(
+    () =>
+      columnWidth > 0
+        ? computeLayout(posts, columnCount, columnWidth)
+        : EMPTY_LAYOUT,
+    [posts, columnCount, columnWidth],
+  );
 
-    const positions: ItemPosition[] = [];
-    const columnHeights = new Array(columnCount).fill(0);
-
-    for (let index = 0; index < posts.length; index++) {
-      const post = posts[index];
-      const shortestColumn = columnHeights.indexOf(Math.min(...columnHeights));
-      const left = shortestColumn * (actualColumnWidth + columnGutter);
-      const top = columnHeights[shortestColumn];
-
-      // Get height from loaded images or estimate
-      let height = itemHeightsRef.current.get(index);
-
-      if (!height && post.image_width && post.image_height) {
-        // Use post dimensions for better estimation
-        const aspectRatio = post.image_height / post.image_width;
-        height = Math.floor(actualColumnWidth * aspectRatio);
-
-        // Set minimum height to prevent collapse
-        height = Math.max(height, actualColumnWidth * 0.5);
-      } else if (!height) {
-        // Fallback with reasonable minimum
-        height = actualColumnWidth * 1.2;
-      }
-
-      positions.push({ top, left, height, column: shortestColumn });
-      columnHeights[shortestColumn] += height + columnGutter;
-    }
-
-    // Only cache if we have content
-    if (positions.length > 0) {
-      positionsCache.current = positions;
-    }
-
-    return positions;
-  }, [posts, columnCount, actualColumnWidth, columnGutter, layoutVersion]);
-
-  const totalHeight = useMemo(() => {
-    if (positions.length === 0) return 0;
-    return Math.max(...positions.map((p) => p.top + p.height)) + columnGutter;
-  }, [positions]);
-
-  // Optimized visible items calculation
-  const visibleItems = useMemo(() => {
-    const overscan = 800;
-    const startY = Math.max(0, scrollTop - overscan);
-    const endY = scrollTop + containerHeight + overscan;
-
-    const visible: Array<{
-      pos: ItemPosition;
-      index: number;
-      post: DanbooruPost;
-    }> = [];
-
-    for (let i = 0; i < positions.length; i++) {
-      const pos = positions[i];
-      if (pos.top + pos.height >= startY && pos.top <= endY) {
-        visible.push({ pos, index: i, post: posts[i] });
-      } else if (pos.top > endY) {
-        break;
-      }
-    }
-
-    // Preload next items
-    if (visible.length > 0) {
-      const lastIndex = visible[visible.length - 1].index;
-      const preloadCount = Math.min(10, posts.length - lastIndex - 1);
-
-      for (let i = 1; i <= preloadCount; i++) {
-        const idx = lastIndex + i;
-        if (positions[idx]) {
-          visible.push({ pos: positions[idx], index: idx, post: posts[idx] });
-        }
-      }
-    }
-
-    return visible;
-  }, [positions, scrollTop, containerHeight, posts]);
-
-  // Cleanup refs for non-visible items
-  React.useEffect(() => {
-    const visibleKeys = new Set(
-      visibleItems.map(
-        ({ post }) => `${post.id}-${new Date(post.created_at).getTime()}`
-      )
+  const visibleIndices = useMemo(() => {
+    const startY = viewport.top - OVERSCAN;
+    const endY = viewport.top + SCROLL_STEP + viewport.height + OVERSCAN;
+    const from = firstIndexWithTopAtLeast(
+      layout.items,
+      startY - layout.maxItemHeight,
     );
+    const to = firstIndexWithTopAtLeast(layout.items, endY);
 
-    const keysToDelete: string[] = [];
-    visibleImageRefs.current.forEach((_, key) => {
-      if (!visibleKeys.has(key)) {
-        keysToDelete.push(key);
-      }
-    });
-
-    keysToDelete.forEach((key) => visibleImageRefs.current.delete(key));
-  }, [visibleItems]);
+    const indices: number[] = [];
+    for (let index = from; index < to; index += 1) {
+      const { top, height } = layout.items[index];
+      if (top + height >= startY) indices.push(index);
+    }
+    return indices;
+  }, [layout, viewport.top, viewport.height]);
 
   return (
     <Box
+      ref={containerRef}
       sx={{ position: "relative", width: "100%" }}
-      style={{ height: totalHeight }}
-      ref={listContainerRef}
+      style={{ height: layout.height }}
     >
-      <Box
-        sx={{
-          px: 1,
-          py: 1,
-          background: (theme) => theme.palette.background.paper + "EE",
-          zIndex: 10000,
-          position: "fixed",
-          bottom: 16,
-          left: 16,
-          display: { xs: "none", md: "block" },
-        }}
-      >
-        <Typography
-          variant="body2"
-          color="textSecondary"
-          fontFamily="monospace"
-        >
-          Pos: {scrollTop} | Items: {posts.length} | Rendered:{" "}
-          {visibleItems.length} | Loaded: {loadedImagesRef.current.size} | Refs:{" "}
-          {visibleImageRefs.current.size}
-        </Typography>
-      </Box>
-
-      {visibleItems.map(({ pos, index, post }) => {
-        const uniqueKey = `${post.id}-${new Date(post.created_at).getTime()}`;
+      {visibleIndices.map((index) => {
+        const post = posts[index];
+        const { top, left, height } = layout.items[index];
         return (
-          <MasonryItem
-            key={uniqueKey}
-            ref={(el) => {
-              if (el) {
-                visibleImageRefs.current.set(uniqueKey, el as HTMLDivElement);
-              }
-            }}
-            onClick={() => onItemClick(post)}
-            style={{
-              top: pos.top + columnGutter,
-              left: pos.left,
-              width: actualColumnWidth,
-              minHeight: pos.height,
-            }}
-          >
-            {(post.file_ext === "webm" || post.file_ext === "mp4") && (
-              <Chip
-                label="VIDEO"
-                size="small"
-                color="secondary"
-                sx={{
-                  position: "absolute",
-                  top: 8,
-                  left: 8,
-                  zIndex: 10,
-                  backgroundColor: "rgba(0, 0, 0, 0.6)",
-                  color: "#fff",
-                  fontWeight: "bold",
-                  pointerEvents: "none",
-                }}
-              />
-            )}
-            <img
-              src={
-                post.file_ext === "webm" || post.file_ext === "mp4"
-                  ? post.preview_file_url
-                  : post.large_file_url || post.preview_file_url
-              }
-              alt={post.tag_string}
-              loading={imageLoading}
-              onLoad={(e) => handleImageLoad(index, uniqueKey, e.currentTarget)}
-              style={{
-                width: "100%",
-                height: "auto",
-                display: "block",
-                objectFit: "cover",
-              }}
-            />
-          </MasonryItem>
+          <MasonryCard
+            key={post.id}
+            post={post}
+            top={top}
+            left={left}
+            width={columnWidth}
+            height={height}
+            imageLoading={imageLoading}
+            onClick={onItemClick}
+          />
         );
       })}
     </Box>
@@ -390,101 +310,74 @@ const MasonryGrid: React.FC<MasonryGridProps> = ({
 };
 
 const ImageGrid = () => {
-  const FETCH_LIMIT = 100;
-  const MAX_EMPTY_PAGE_HOPS = 5;
-
   const navigate = useNavigate();
-  const [posts, setPosts] = React.useState<DanbooruPost[]>([]);
-  const [loading, setLoading] = React.useState<boolean>(false);
-  const [page, setPage] = React.useState<number>(1);
-  const [hasMore, setHasMore] = React.useState<boolean>(true);
-  const [imageLoading, setImageLoading] = React.useState<"lazy" | "eager">(
-    "lazy"
-  );
-  const scrollableRef = React.useRef<HTMLDivElement>(null);
-  const loadingRef = React.useRef(false);
-
   const [searchParams] = useSearchParams();
   const tags = searchParams.get("tags") || "";
   const activeTags = useMemo(
-    () => tags.split(",").map((tag) => tag.trim()).filter(Boolean),
-    [tags]
+    () =>
+      tags
+        .split(",")
+        .map((tag) => tag.trim())
+        .filter(Boolean),
+    [tags],
   );
 
-  React.useEffect(() => {
-    const savedImageLoading = localStorage.getItem("image_loading") as
-      | "lazy"
-      | "eager"
-      | null;
-    if (savedImageLoading) {
-      setImageLoading(savedImageLoading);
-    }
-  }, []);
-
-  const toUniquePosts = useCallback((inputPosts: DanbooruPost[]) => {
-    const postsWithFiles = inputPosts.filter((post) => post.file_url);
-    return Array.from(
-      new Map(postsWithFiles.map((post) => [post.id, post])).values()
-    );
-  }, []);
+  const [posts, setPosts] = useState<DanbooruPost[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(true);
+  const [imageLoading] = useState<ImageLoading>(() =>
+    localStorage.getItem("image_loading") === "eager" ? "eager" : "lazy",
+  );
+  const pageRef = useRef(1);
+  const loadingRef = useRef(false);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   const fetchVisibleBatch = useCallback(
     async (startPage: number) => {
       let currentPage = startPage;
-      let lastFetchedPage = Math.max(startPage - 1, 0);
       let hasMoreFromApi = true;
 
-      for (let attempts = 0; attempts < MAX_EMPTY_PAGE_HOPS; attempts += 1) {
+      for (let attempt = 0; attempt < MAX_EMPTY_PAGE_HOPS; attempt += 1) {
         const result = await danbooruService.fetchPosts(
           activeTags,
           currentPage,
-          FETCH_LIMIT
+          FETCH_LIMIT,
         );
-
-        lastFetchedPage = currentPage;
         hasMoreFromApi = result.hasMore;
 
-        const processedPosts = toUniquePosts(result.posts);
-        if (processedPosts.length > 0 || !hasMoreFromApi) {
-          return {
-            posts: processedPosts,
-            page: lastFetchedPage,
-            hasMore: hasMoreFromApi,
-          };
+        const batch = uniqueById(result.posts.filter((post) => post.file_url));
+        if (batch.length > 0 || !hasMoreFromApi) {
+          return { posts: batch, page: currentPage, hasMore: hasMoreFromApi };
         }
 
         currentPage += 1;
       }
 
-      return {
-        posts: [],
-        page: lastFetchedPage,
-        hasMore: hasMoreFromApi,
-      };
+      return { posts: [], page: currentPage - 1, hasMore: hasMoreFromApi };
     },
-    [FETCH_LIMIT, MAX_EMPTY_PAGE_HOPS, activeTags, toUniquePosts]
+    [activeTags],
   );
 
-  React.useEffect(() => {
+  useEffect(() => {
     const fetchInitialPosts = async () => {
-      setLoading(true);
       loadingRef.current = true;
-      setPage(1);
+      setLoading(true);
       setHasMore(true);
       setPosts([]);
-      scrollableRef.current?.scrollTo({ top: 0, behavior: "auto" });
+      pageRef.current = 1;
+      window.scrollTo({ top: 0, behavior: "auto" });
 
       try {
-        const initialResult = await fetchVisibleBatch(1);
-        setPosts(initialResult.posts);
-        setPage(initialResult.page);
-        setHasMore(initialResult.hasMore);
+        const result = await fetchVisibleBatch(1);
+        setPosts(result.posts);
+        pageRef.current = result.page;
+        setHasMore(result.hasMore);
       } catch (error) {
         console.error("Error fetching posts:", error);
         setHasMore(false);
       } finally {
-        setLoading(false);
         loadingRef.current = false;
+        setLoading(false);
       }
     };
 
@@ -498,151 +391,69 @@ const ImageGrid = () => {
     setLoading(true);
 
     try {
-      const nextPage = page + 1;
-      const batchResult = await fetchVisibleBatch(nextPage);
-
-      if (batchResult.posts.length > 0) {
-        setPosts((prev) => {
-          const combined = [...prev, ...batchResult.posts];
-          return Array.from(
-            new Map(combined.map((post) => [post.id, post])).values()
-          );
-        });
+      const result = await fetchVisibleBatch(pageRef.current + 1);
+      if (result.posts.length > 0) {
+        setPosts((prev) => uniqueById([...prev, ...result.posts]));
       }
-
-      setPage(batchResult.page);
-      setHasMore(batchResult.hasMore);
+      pageRef.current = result.page;
+      setHasMore(result.hasMore);
     } catch (error) {
       console.error("Error fetching more posts:", error);
       setHasMore(false);
     } finally {
-      setLoading(false);
       loadingRef.current = false;
+      setLoading(false);
     }
-  }, [fetchVisibleBatch, hasMore, page]);
+  }, [fetchVisibleBatch, hasMore]);
 
-  const handleScroll = useCallback(() => {
-    const scrollableDiv = scrollableRef.current;
-    if (!scrollableDiv || loadingRef.current || !hasMore) return;
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel || loading || !hasMore) return;
 
-    const { scrollTop, scrollHeight, clientHeight } = scrollableDiv;
-    if (scrollHeight - scrollTop - clientHeight < 850) {
-      loadMorePosts();
-    }
-  }, [loadMorePosts, hasMore]);
-
-  React.useEffect(() => {
-    const maybePrefetchIfViewportNotFilled = () => {
-      const scrollableDiv = scrollableRef.current;
-      if (!scrollableDiv || loadingRef.current || !hasMore) {
-        return;
-      }
-
-      if (scrollableDiv.scrollHeight <= scrollableDiv.clientHeight + 200) {
-        loadMorePosts();
-      }
-    };
-
-    const rafId = requestAnimationFrame(maybePrefetchIfViewportNotFilled);
-    return () => cancelAnimationFrame(rafId);
-  }, [posts, hasMore, loadMorePosts]);
-
-  React.useEffect(() => {
-    const scrollableDiv = scrollableRef.current;
-    if (!scrollableDiv) return;
-
-    let rafId: number | null = null;
-    const throttledScroll = () => {
-      if (rafId === null) {
-        rafId = requestAnimationFrame(() => {
-          handleScroll();
-          rafId = null;
-        });
-      }
-    };
-
-    scrollableDiv.addEventListener("scroll", throttledScroll, {
-      passive: true,
-    });
-    return () => {
-      if (rafId !== null) cancelAnimationFrame(rafId);
-      scrollableDiv.removeEventListener("scroll", throttledScroll);
-    };
-  }, [handleScroll]);
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) loadMorePosts();
+      },
+      { rootMargin: `0px 0px ${LOAD_MORE_MARGIN}px 0px` },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [loading, hasMore, loadMorePosts]);
 
   const handleItemClick = useCallback(
-    (post: DanbooruPost) => {
-      const currentTags = searchParams.get("tags")?.split(",") || [];
-      navigate(
-        `/search/${post.id}?tags=${encodeURIComponent(currentTags.join(","))}`
-      );
-    },
-    [navigate, searchParams]
+    (post: DanbooruPost) =>
+      navigate(`/search/${post.id}?tags=${encodeURIComponent(tags)}`),
+    [navigate, tags],
   );
 
+  const hasPosts = posts.length > 0;
+
   return (
-    <Box
-      ref={scrollableRef}
-      id="scrollableDiv"
-      sx={{
-        height: "100%",
-        overflow: "auto",
-        overflowX: "hidden",
-        WebkitOverflowScrolling: "touch",
-        scrollbarWidth: "thin",
-        "&::-webkit-scrollbar": {
-          width: { xs: "2px", sm: "4px" },
-        },
-        "&::-webkit-scrollbar-track": {
-          background: "rgba(30, 30, 30, 0.2)",
-        },
-        "&::-webkit-scrollbar-thumb": {
-          background: "rgba(160, 160, 160, 0.3)",
-          borderRadius: "2px",
-          "&:hover": {
-            background: "rgba(160, 160, 160, 0.4)",
-          },
-        },
-        px: { xs: 0.5, sm: 1, md: 2 },
-        pr: { xs: 0.5, sm: 2 },
-      }}
-    >
-      {posts.length > 0 && (
+    <Box sx={{ px: { xs: 0.5, sm: 1, md: 2 }, pr: { xs: 0.5, sm: 2 } }}>
+      {hasPosts && (
         <MasonryGrid
           posts={posts}
           onItemClick={handleItemClick}
-          scrollableRef={scrollableRef}
           imageLoading={imageLoading}
         />
       )}
 
-      {loading && posts.length === 0 && (
+      <div ref={sentinelRef} />
+
+      {loading && (
         <Box
           sx={{
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
-            height: "50vh",
+            ...(hasPosts ? { py: 4 } : { height: "50vh" }),
           }}
         >
-          <CircularProgress size={60} thickness={4} />
+          <CircularProgress size={hasPosts ? 40 : 60} thickness={4} />
         </Box>
       )}
 
-      {loading && posts.length > 0 && (
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            py: 4,
-          }}
-        >
-          <CircularProgress size={40} thickness={4} />
-        </Box>
-      )}
-
-      {!loading && !hasMore && posts.length > 0 && (
+      {!loading && !hasMore && hasPosts && (
         <Box
           sx={{
             display: "flex",

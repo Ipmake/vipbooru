@@ -18,13 +18,10 @@ export const danbooruUtil = {
     },
 
     // Tag color utility
-    getTagColor: (tag: string): "default" | "primary" | "secondary" | "success" | "error" | "info" | "warning" => {
-        if (tag.startsWith("rating:")) return "warning";
-        else if (tag.startsWith("order:")) return "info";
-        else if (tag.startsWith("-")) return "error";
-        else if (tag.includes("_")) return "primary";
-        else if (tag.includes(":")) return "secondary";
-        return "default";
+    getTagColor: (tag: string): string => {
+        if (tag.startsWith("rating:")) return "#5E81F4";
+        else if (tag.startsWith("order:")) return "#B388FF";
+        return "#94A3B8";
     },
 
     // Category color utility

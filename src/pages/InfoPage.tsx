@@ -9,7 +9,6 @@ import {
   Button,
   Paper,
   Divider,
-  IconButton,
   Alert,
   Select,
   MenuItem,
@@ -22,8 +21,7 @@ import {
   Switch,
   IconButton as MuiIconButton,
 } from "@mui/material";
-import { ArrowBack, DeleteOutline } from "@mui/icons-material";
-import { useNavigate } from "react-router-dom";
+import { DeleteOutline } from "@mui/icons-material";
 import { danbooruService } from "../services/danbooru";
 import { danbooruUtil } from "../utils/danbooru";
 import {
@@ -93,7 +91,6 @@ const parseBlacklistEntries = (value: string | null): BlacklistTagSetting[] => {
 };
 
 function InfoPage() {
-  const navigate = useNavigate();
   const [apiKey, setApiKey] = React.useState("");
   const [username, setUsername] = React.useState("");
   const [imageLoading, setImageLoading] = React.useState<"lazy" | "eager">(
@@ -253,30 +250,9 @@ function InfoPage() {
         flexDirection: "column",
         px: { xs: 1.5, sm: 3, md: 4 },
         py: { xs: 2, sm: 3 },
+        mt: 9,
       }}
     >
-      {/* Header */}
-      <Box sx={{ display: "flex", alignItems: "center", mb: { xs: 2, sm: 3 } }}>
-        <IconButton
-          onClick={() => navigate(-1)}
-          sx={{
-            mr: { xs: 1, sm: 2 },
-            color: "primary.main",
-            width: { xs: 40, sm: 48 },
-            height: { xs: 40, sm: 48 },
-          }}
-        >
-          <ArrowBack />
-        </IconButton>
-        <Typography
-          variant="h4"
-          fontWeight="bold"
-          sx={{ fontSize: { xs: "1.5rem", sm: "2.125rem" } }}
-        >
-          Info & Settings
-        </Typography>
-      </Box>
-
       <Box sx={{ maxWidth: 800, mx: "auto", width: "100%" }}>
         {/* About Section */}
         <Paper
@@ -486,7 +462,7 @@ function InfoPage() {
             onInputChange={(_, value) => setBlacklistInputValue(value)}
             onChange={(_, newValue) => {
               const nextTags = newValue.map((item) =>
-                typeof item === "string" ? item : item.value
+                typeof item === "string" ? item : item.value,
               );
               mergeBlacklistTags(nextTags);
             }}
@@ -497,7 +473,7 @@ function InfoPage() {
                 const tagText = isString ? option : option.label;
                 const { key, ...chipProps } = getTagProps({ index });
                 const entry = blacklistEntries.find(
-                  (item) => normalizeTag(item.tag) === normalizeTag(tagText)
+                  (item) => normalizeTag(item.tag) === normalizeTag(tagText),
                 );
 
                 return (
@@ -506,7 +482,6 @@ function InfoPage() {
                     size="small"
                     variant={entry?.enabled === false ? "outlined" : "filled"}
                     label={tagText}
-                    color={danbooruUtil.getTagColor(tagText)}
                     sx={{
                       borderRadius: "4px",
                       fontWeight: 400,
@@ -635,7 +610,6 @@ function InfoPage() {
                   <Chip
                     label={entry.tag}
                     size="small"
-                    color={danbooruUtil.getTagColor(entry.tag)}
                     variant={entry.enabled ? "filled" : "outlined"}
                     sx={{ opacity: entry.enabled ? 1 : 0.65 }}
                   />

@@ -3,7 +3,6 @@ import {
 } from "@mui/material";
 
 // Component imports
-import SearchBar from "../components/SearchBar";
 import ImageGrid from "../components/ImageGrid";
 import ImagePreviewDrawer from "../components/ImagePreviewDrawer";
 
@@ -16,11 +15,11 @@ function SearchPage() {
         overflow: "hidden",
         display: "flex",
         flexDirection: "column",
-        px: { xs: 0, sm: 1, md: 2, lg: 3 },
+        mt: 9,
       }}
     >
       {/* Search area */}
-      <SearchBar />
+      
       
       {/* Main content area */}
       <ImageGrid />

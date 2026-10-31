@@ -1,5 +1,31 @@
 // API Types
+export interface MediaAssetVariant {
+  type: string;
+  url: string;
+  width: number;
+  height: number;
+  file_ext: string;
+}
+
+export interface MediaAsset {
+  id: number;
+  created_at: string;
+  updated_at: string;
+  md5: string;
+  file_ext: string;
+  file_size: number;
+  image_width: number;
+  image_height: number;
+  duration: number | null;
+  status: string;
+  file_key: string;
+  is_public: boolean;
+  pixel_hash: string;
+  variants: MediaAssetVariant[];
+}
+
 export interface DanbooruPost {
+  // Existing fields
   id: number;
   created_at: string;
   uploader_id: number;
@@ -15,7 +41,7 @@ export interface DanbooruPost {
   file_url: string;
   large_file_url: string;
   preview_file_url: string;
-  sample_file_url: string;
+  sample_file_url?: string;
   tag_string_general: string;
   tag_string_character: string;
   tag_string_copyright: string;
@@ -23,7 +49,32 @@ export interface DanbooruPost {
   tag_string_meta: string;
   has_large: boolean;
   file_size: number;
-  // Other fields omitted for brevity
+
+  // Additional fields from payload
+  updated_at: string;
+  last_comment_bumped_at: string | null;
+  last_commented_at: string | null;
+  last_noted_at: string | null;
+  parent_id: number | null;
+  approver_id: number | null;
+  pixiv_id: number | null;
+  up_score: number;
+  down_score: number;
+  bit_flags: number;
+  tag_count: number;
+  tag_count_general: number;
+  tag_count_artist: number;
+  tag_count_character: number;
+  tag_count_copyright: number;
+  tag_count_meta: number;
+  has_children: boolean;
+  has_active_children: boolean;
+  has_visible_children: boolean;
+  is_pending: boolean;
+  is_flagged: boolean;
+  is_deleted: boolean;
+  is_banned: boolean;
+  media_asset?: MediaAsset;
 }
 
 export interface AutocompleteResult {
