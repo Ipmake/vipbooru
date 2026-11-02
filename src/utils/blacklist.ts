@@ -22,6 +22,7 @@ export const BLACKLIST_HELP_URL =
   "https://danbooru.donmai.us/wiki_pages/help:blacklists";
 
 export const RULE_PRESETS = [
+  { label: "AI Slop", rule: "ai-generated" },
   { label: "Explicit", rule: "rating:explicit" },
   { label: "Questionable", rule: "rating:questionable" },
   { label: "Sensitive", rule: "rating:sensitive" },
